@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FlyTau System Check</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        .box { border: 1px solid #ccc; padding: 20px; display: inline-block; border-radius: 10px; background-color: #f9f9f9; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>FlyTau System Check</h1>
+        <hr>
+        <p>Database Connection:
+            {% if db_status %}
+                <span class="success">Connected ✅</span>
+            {% else %}
+                <span class="error">Failed ❌</span>
+            {% endif %}
+        </p>
+
+        <p>Admin Check:
+            <br><br>
+            <span style="font-size: 1.2em;">{{ admin_msg }}</span>
+        </p>
+    </div>
+</body>
+</html>
