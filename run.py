@@ -1,21 +1,22 @@
-from flask import Flask, render_template
-# 1. Import DB Connector (Savage's logic)
-from app.classes.db_connector import DB
+from flask import Flask
+from app.classes.db_manager import DBManager
+# הפנייה למיקום האמיתי בתוך models/daos
+from app.models.daos.employee_dao import EmployeeDAO
+from app.routes.admin_routes import admin_bp
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key' # חובה עבור Session
 
-@app.route('/')
-def home():
-    # Check DB connection in Console only (keeping HTML clean for now)
-    try:
-        roles = DB.execute_query("SELECT count(*) as count FROM roles")
-        print(f"✅ DB Check: Connection Successful! Found {roles[0]['count']} roles.")
-    except Exception as e:
-        print(f"❌ DB Check: Connection Failed. Error: {e}")
+# אתחול ה-DB
+db = DBManager()
+app.employee_dao = EmployeeDAO(db)
 
-    # 2. Render the base template (Sela's design)
-    return render_template('base.html')
+# הצמדת ה-DAO לאפליקציה כדי שיהיה זמין ב-Blueprints
+app.employee_dao = EmployeeDAO(db)
+
+# רישום ה-Blueprint
+app.register_blueprint(admin_bp, url_prefix='/admin')
 
 if __name__ == '__main__':
-    # 3. Run config (Port 5001 for Mac compatibility)
+    # שינוי הפורט ל-5001 כדי למנוע התנגשות ב-Mac
     app.run(debug=True, port=5001)
