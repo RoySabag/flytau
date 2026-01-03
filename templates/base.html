@@ -1,33 +1,43 @@
 <!DOCTYPE html>
-<html lang="en"> <head>
+<html lang="en">
+
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}My Project{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
+
 <body>
 
     <nav class="navbar">
         <div class="logo">
-            <a href="/">
+            <a href="{{ url_for('routes.home') }}">
                 <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Project Logo" height="40">
             </a>
         </div>
         <ul class="nav-links">
-            <li><a href="/search">Search</a></li>
-            <li><a href="/login" class="btn-login">Login</a></li>
+            <li><a href="/">Search</a></li>
+
+            {% if session.get('user_name') %}
+            <li style="color: white; margin-right: 15px;">Hello, {{ session['user_name'] }}</li>
+            <li><a href="{{ url_for('routes.logout') }}" class="btn-login" style="background-color: #dc3545;">Logout</a>
+            </li>
+            {% else %}
+            <li><a href="{{ url_for('routes.login') }}" class="btn-login">Login</a></li>
+            {% endif %}
         </ul>
     </nav>
 
     <main class="container">
         {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <ul class="flashes">
-                {% for message in messages %}
-                    <li>{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
+        {% if messages %}
+        <ul class="flashes">
+            {% for message in messages %}
+            <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
         {% endwith %}
 
         {% block content %}
@@ -39,4 +49,5 @@
     </footer>
 
 </body>
+
 </html>
