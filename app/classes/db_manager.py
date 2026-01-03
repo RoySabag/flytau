@@ -73,5 +73,19 @@ class DBManager:
 
         return result
 
+
+    def fetch_one(self, query, params=None):
+        connection = self.get_connection()
+        cursor = connection.cursor(dictionary=True) # חשוב! מחזיר תוצאות כמילון
+        try:
+            cursor.execute(query, params)
+            result = cursor.fetchone()
+            return result
+        except Exception as e:
+            print(f"Error executing query: {e}")
+            return None
+        finally:
+            cursor.close()
+            connection.close()
 # יצירת אובייקט נגיש
 DB = DBManager()
