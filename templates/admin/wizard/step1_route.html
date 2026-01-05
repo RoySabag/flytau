@@ -1,55 +1,89 @@
 {% extends 'admin/base.html' %}
 
 {% block admin_content %}
-<div class="mb-4">
-    <h4>Step 1: Flight Details</h4>
-    <div class="progress" style="height: 5px;">
-        <div class="progress-bar" role="progressbar" style="width: 33%;" aria-valuenow="33" aria-valuemin="0"
-            aria-valuemax="100"></div>
+<div class="row justify-content-center fade-in">
+    <div class="col-lg-8">
+
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <h4 class="mb-0">Create New Flight</h4>
+            <span class="text-muted small">Wizard Step 1 of 3</span>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="position-relative mb-5">
+            <div class="progress" style="height: 4px;">
+                <div class="progress-bar" role="progressbar" style="width: 33%;"></div>
+            </div>
+            <div class="position-absolute top-0 start-0 translate-middle btn btn-sm btn-primary rounded-pill"
+                style="width: 2rem; height:2rem; padding:0; display:flex; align-items:center; justify-content:center; left: 0%;">
+                1</div>
+            <div class="position-absolute top-0 start-50 translate-middle btn btn-sm btn-secondary rounded-pill"
+                style="width: 2rem; height:2rem; padding:0; display:flex; align-items:center; justify-content:center;">2
+            </div>
+            <div class="position-absolute top-0 start-100 translate-middle btn btn-sm btn-secondary rounded-pill"
+                style="width: 2rem; height:2rem; padding:0; display:flex; align-items:center; justify-content:center;">3
+            </div>
+        </div>
+
+        <div class="card p-4 border-0">
+            <div class="card-body">
+                <h5 class="card-title mb-4 border-bottom pb-3 border-secondary">Route & Logistics</h5>
+
+                <form method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Origin Airport</label>
+                            <select class="form-select form-select-lg" name="origin" required>
+                                <option value="" disabled selected>Select Origin...</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc }}">{{ loc }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Destination
+                                Airport</label>
+                            <select class="form-select form-select-lg" name="destination" required>
+                                <option value="" disabled selected>Select Destination...</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc }}">{{ loc }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Departure Time</label>
+                            <input type="datetime-local" class="form-control form-control-lg" name="departure_time"
+                                required>
+                        </div>
+
+                        <div class="col-md-6 mt-4">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Economy Price ($)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-muted">$</span>
+                                <input type="number" class="form-control" name="economy_price" placeholder="400"
+                                    required>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mt-4">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Business Price ($)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-muted">$</span>
+                                <input type="number" class="form-control" name="business_price" placeholder="1200"
+                                    required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-5 pt-3 border-top border-secondary">
+                        <button type="submit" class="btn btn-primary px-5 btn-lg shadow-neon">
+                            Next Step <i class="bi bi-arrow-right ms-2"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     </div>
 </div>
-
-<form method="POST">
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label>Origin Airport</label>
-            <select name="origin" class="form-control" required>
-                <option value="">Select Origin...</option>
-                {% for loc in locations %}
-                <option value="{{ loc }}">{{ loc }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="col-md-6 mb-3">
-            <label>Destination Airport</label>
-            <select name="destination" class="form-control" required>
-                <option value="">Select Destination...</option>
-                {% for loc in locations %}
-                <option value="{{ loc }}">{{ loc }}</option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
-
-    <div class="mb-3">
-        <label>Departure Time</label>
-        <input type="datetime-local" name="departure_time" class="form-control" required>
-    </div>
-
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label>Economy Price ($)</label>
-            <input type="number" name="economy_price" class="form-control" step="0.01" required>
-        </div>
-        <div class="col-md-6 mb-3">
-            <label>Business Price ($)</label>
-            <input type="number" name="business_price" class="form-control" step="0.01" required>
-        </div>
-    </div>
-
-    <div class="text-end mt-4">
-        <button type="submit" class="btn btn-primary">Next: Select Aircraft &rarr;</button>
-    </div>
-</form>
 {% endblock %}

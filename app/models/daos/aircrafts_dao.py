@@ -23,6 +23,10 @@ class AircraftDAO:
         """
         return self.db.fetch_one(query, (flight_id,))
 
+    def get_aircraft_by_id(self, aircraft_id):
+        query = "SELECT * FROM aircraft WHERE aircraft_id = %s"
+        return self.db.fetch_one(query, (aircraft_id,))
+
     def get_available_aircrafts_for_flight(self, flight_id):
         # --- שלב א: הכנת נתונים (זהה לקודם) ---
         flight = self.get_flight_details(flight_id)

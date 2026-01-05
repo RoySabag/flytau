@@ -1,60 +1,146 @@
 {% extends 'admin/base.html' %}
 
 {% block admin_content %}
-<div class="mb-4">
-    <h4>Step 3: Select Crew</h4>
-    <div class="progress" style="height: 5px;">
-        <div class="progress-bar" role="progressbar" style="width: 100%;" aria-valuenow="100" aria-valuemin="0"
-            aria-valuemax="100"></div>
+<div class="row justify-content-center fade-in">
+    <div class="col-lg-12">
+
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <h4 class="mb-0">Select Crew</h4>
+            <span class="text-muted small">Wizard Step 3 of 3</span>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="position-relative mb-5">
+            <div class="progress" style="height: 4px;">
+                <div class="progress-bar" role="progressbar" style="width: 100%;"></div>
+            </div>
+            <div class="position-absolute top-0 start-0 translate-middle btn btn-sm btn-primary rounded-pill"
+                style="width: 2rem; height:2rem; padding:0; display:flex; align-items:center; justify-content:center; left: 0%;">
+                1</div>
+            <div class="position-absolute top-0 start-50 translate-middle btn btn-sm btn-primary rounded-pill"
+                style="width: 2rem; height:2rem; padding:0; display:flex; align-items:center; justify-content:center;">2
+            </div>
+            <div class="position-absolute top-0 start-100 translate-middle btn btn-sm btn-primary rounded-pill"
+                style="width: 2rem; height:2rem; padding:0; display:flex; align-items:center; justify-content:center;">3
+            </div>
+        </div>
+
+        <div
+            class="alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 d-flex align-items-center gap-3">
+            <i class="bi bi-shield-exclamation fs-3 text-warning"></i>
+            <div>
+                <strong>Strict Constraints for {{ constraints.size }} Aircraft:</strong><br>
+                Required: <span class="badge bg-warning text-dark mx-1">{{ constraints.pilots }} Pilots</span> and <span
+                    class="badge bg-warning text-dark mx-1">{{ constraints.attendants }} Flight Attendants</span>.
+            </div>
+        </div>
+
+        <form method="POST">
+            <div class="row g-4">
+                <!-- Pilots Column -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-0">
+                        <div
+                            class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center pt-4 px-4">
+                            <h5 class="mb-0 d-flex align-items-center gap-2"><i
+                                    class="bi bi-person-badge text-primary"></i> Select Pilots</h5>
+                            <span class="badge bg-secondary">{{ constraints.pilots }} Needed</span>
+                        </div>
+                        <div class="card-body p-0">
+
+                            {% if warnings and warnings.pilots %}
+                            <div class="alert alert-danger m-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-x-circle-fill"></i> {{ warnings.pilots }}
+                            </div>
+                            {% endif %}
+
+                            <div class="list-group list-group-flush p-3">
+                                {% for pilot in pilots %}
+                                <label
+                                    class="list-group-item list-group-item-action d-flex align-items-start gap-3 p-3 border rounded mb-2">
+                                    <input class="form-check-input mt-1" type="checkbox" name="pilots"
+                                        value="{{ pilot.id_number }}">
+                                    <div class="w-100">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold">{{ pilot.first_name }} {{ pilot.last_name }}</span>
+                                            <span
+                                                class="badge {{ 'bg-success' if 'Perfect' in pilot.match_quality else 'bg-secondary' }}">
+                                                {{ pilot.match_quality }}
+                                            </span>
+                                        </div>
+                                        {% if pilot.needs_transfer %}
+                                        <div class="small text-warning mt-1"><i class="bi bi-arrow-repeat"></i> Needs
+                                            Transfer (Flight #{{ pilot.transfer_flight_id or 'Unknown' }})</div>
+                                        {% else %}
+                                        <div class="small text-success mt-1"><i class="bi bi-check2"></i> Ready at
+                                            Location</div>
+                                        {% endif %}
+                                    </div>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attendants Column -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-0">
+                        <div
+                            class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center pt-4 px-4">
+                            <h5 class="mb-0 d-flex align-items-center gap-2"><i
+                                    class="bi bi-people-fill text-accent"></i> Select Attendants</h5>
+                            <span class="badge bg-secondary">{{ constraints.attendants }} Needed</span>
+                        </div>
+                        <div class="card-body p-0">
+
+                            {% if warnings and warnings.attendants %}
+                            <div class="alert alert-danger m-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-x-circle-fill"></i> {{ warnings.attendants }}
+                            </div>
+                            {% endif %}
+
+                            <div class="list-group list-group-flush p-3">
+                                {% for att in attendants %}
+                                <label
+                                    class="list-group-item list-group-item-action d-flex align-items-start gap-3 p-3 border rounded mb-2">
+                                    <input class="form-check-input mt-1" type="checkbox" name="attendants"
+                                        value="{{ att.id_number }}">
+                                    <div class="w-100">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold">{{ att.first_name }} {{ att.last_name }}</span>
+                                            <small class="text-muted">{{ att.match_quality }}</small>
+                                        </div>
+                                        {% if att.needs_transfer %}
+                                        <div class="small text-warning mt-1"><i class="bi bi-arrow-repeat"></i> Needs
+                                            Transfer</div>
+                                        {% else %}
+                                        <div class="small text-success mt-1"><i class="bi bi-check2"></i> Ready at
+                                            Location</div>
+                                        {% endif %}
+                                    </div>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-5 pb-5">
+                <a href="{{ url_for('admin.create_flight_step2') }}" class="btn btn-outline-secondary px-4">Back</a>
+
+                {% if warnings and (warnings.pilots or warnings.attendants) %}
+                <button type="button" class="btn btn-danger btn-lg px-5 cursor-not-allowed opacity-75" disabled>
+                    <i class="bi bi-slash-circle me-2"></i> Fix Crew Shortage
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-success btn-lg px-5 shadow-neon">
+                    <i class="bi bi-rocket-takeoff-fill me-2"></i> Finish & Launch
+                </button>
+                {% endif %}
+            </div>
+        </form>
     </div>
 </div>
-
-<form method="POST">
-    <div class="row">
-        <!-- Pilots Column -->
-        <div class="col-md-6">
-            <h5 class="mb-3">Select Pilots (Need 2-3)</h5>
-            <div class="list-group">
-                {% for pilot in pilots %}
-                <label class="list-group-item list-group-item-action">
-                    <input class="form-check-input me-1" type="checkbox" name="pilots" value="{{ pilot.id_number }}">
-                    {{ pilot.first_name }} {{ pilot.last_name }}
-                    <div class="text-muted small">
-                        Matched: <span
-                            class="{{ 'text-success' if 'Perfect' in pilot.match_quality else 'text-secondary' }}">{{
-                            pilot.match_quality }}</span>
-                        {% if pilot.needs_transfer %}
-                        | ✈️ Needs Transfer ({{ pilot.transfer_flight_id or 'Unavailable' }})
-                        {% endif %}
-                    </div>
-                </label>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Attendants Column -->
-        <div class="col-md-6">
-            <h5 class="mb-3">Select Attendants (Need 3-6)</h5>
-            <div class="list-group">
-                {% for att in attendants %}
-                <label class="list-group-item list-group-item-action">
-                    <input class="form-check-input me-1" type="checkbox" name="attendants" value="{{ att.id_number }}">
-                    {{ att.first_name }} {{ att.last_name }}
-                    <div class="text-muted small">
-                        {{ att.match_quality }}
-                        {% if att.needs_transfer %}
-                        | ✈️ Needs Transfer
-                        {% endif %}
-                    </div>
-                </label>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-    <div class="d-flex justify-content-between mt-5">
-        <a href="{{ url_for('admin.create_flight_step2') }}" class="btn btn-outline-secondary">&larr; Back</a>
-        <button type="submit" class="btn btn-success btn-lg">Finish & Schedule Flight 🎉</button>
-    </div>
-</form>
 {% endblock %}

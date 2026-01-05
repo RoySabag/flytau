@@ -1,28 +1,46 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row">
+<div class="row fade-in">
     <!-- Sidebar / Sub-navigation -->
     <div class="col-md-3">
-        <div class="list-group mt-3">
-            <a href="{{ url_for('admin.dashboard') }}"
-                class="list-group-item list-group-item-action {% if active_page == 'dashboard' %}active{% endif %}">
-                Admin Dashboard
-            </a>
-            <a href="{{ url_for('admin.view_flights') }}" class="list-group-item list-group-item-action">View All
-                Flights</a>
-            <a href="{{ url_for('routes.logout') }}"
-                class="list-group-item list-group-item-action text-danger mt-5">Logout</a>
+        <div class="card border-0 mb-3">
+            <div class="card-body p-0 overflow-hidden rounded">
+                <div class="list-group list-group-flush">
+                    <div class="p-3 bg-card-dark text-muted text-uppercase small fw-bold text-center">Admin Console
+                    </div>
+
+                    <a href="{{ url_for('admin.dashboard') }}"
+                        class="list-group-item list-group-item-action d-flex align-items-center p-3 {% if active_page == 'dashboard' %}active{% endif %}">
+                        <i class="bi bi-speedometer2 me-3 fs-5"></i> Dashboard
+                    </a>
+
+                    <a href="{{ url_for('admin.view_flights') }}"
+                        class="list-group-item list-group-item-action d-flex align-items-center p-3 {% if active_page == 'flights' %}active{% endif %}">
+                        <i class="bi bi-airplane me-3 fs-5"></i> Manage Flights
+                    </a>
+
+                    <a href="{{ url_for('routes.logout') }}"
+                        class="list-group-item list-group-item-action d-flex align-items-center p-3 text-danger mt-3 border-top">
+                        <i class="bi bi-power me-3 fs-5"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats Widget -->
+        <div class="card text-center p-3 d-none d-md-block">
+            <small class="text-muted text-uppercase">System Status</small>
+            <div class="d-flex align-items-center justify-content-center gap-2 mt-2">
+                <span class="badge bg-success rounded-circle p-1"> </span>
+                <span class="fw-bold text-white">Operational</span>
+            </div>
         </div>
     </div>
 
     <!-- Main Content Area -->
     <div class="col-md-9">
-        <div class="card mt-3">
-            <div class="card-body">
-                {% block admin_content %}{% endblock %}
-            </div>
-        </div>
+        {% block admin_content %}{% endblock %}
     </div>
 </div>
 {% endblock %}

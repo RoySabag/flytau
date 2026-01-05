@@ -90,9 +90,41 @@ def create_flight_step3():
     wizard_data = session.get('wizard_data', {})
     if not wizard_data: return redirect(url_for('admin.create_flight_step1'))
 
+    # Determine Constraints based on Aircraft
+    aircraft_id = wizard_data.get('aircraft_id')
+    req_pilots = 2
+    req_attendants = 3
+    aircraft_size = 'Small'
+
+    if aircraft_id:
+        aircraft = aircraft_dao.get_aircraft_by_id(aircraft_id)
+        if aircraft and aircraft['size'] == 'Big':
+            aircraft_size = 'Big'
+            req_pilots = 3
+            req_attendants = 6
+    
+    constraints = {
+        'pilots': req_pilots,
+        'attendants': req_attendants,
+        'size': aircraft_size
+    }
+
     if request.method == 'POST':
-        wizard_data['pilot_ids'] = request.form.getlist('pilots')
-        wizard_data['attendant_ids'] = request.form.getlist('attendants')
+        pilot_ids = request.form.getlist('pilots')
+        attendant_ids = request.form.getlist('attendants')
+        
+        # --- Strict Validation Block ---
+        if len(pilot_ids) != req_pilots:
+            flash(f"Error: {aircraft_size} aircraft requires exactly {req_pilots} pilots. You selected {len(pilot_ids)}.", "danger")
+            return redirect(url_for('admin.create_flight_step3'))
+            
+        if len(attendant_ids) != req_attendants:
+            flash(f"Error: {aircraft_size} aircraft requires exactly {req_attendants} attendants. You selected {len(attendant_ids)}.", "danger")
+            return redirect(url_for('admin.create_flight_step3'))
+        # -------------------------------
+
+        wizard_data['pilot_ids'] = pilot_ids
+        wizard_data['attendant_ids'] = attendant_ids
         session['wizard_data'] = wizard_data
         
         # 1. Create Flight
@@ -114,12 +146,11 @@ def create_flight_step3():
             aircraft_dao.assign_aircraft_to_flight(flight_id, wizard_data['aircraft_id'])
 
         # 3. Assign Crew
-        if wizard_data.get('pilot_ids') and wizard_data.get('attendant_ids'):
-            crew_scheduler.assign_selected_crew(
-                flight_id, 
-                wizard_data['pilot_ids'], 
-                wizard_data['attendant_ids']
-            )
+        crew_scheduler.assign_selected_crew(
+            flight_id, 
+            pilot_ids, 
+            attendant_ids
+        )
 
         flash(f"Flight {flight_id} Scheduled Successfully with Crew & Aircraft! ✈️", "success")
         return redirect(url_for('admin.view_flights'))
@@ -135,7 +166,7 @@ def create_flight_step3():
         dep_time, 
         route_info['flight_duration'],
         'Pilot', 
-        10
+        50
     )
     
     attendants = crew_scheduler.get_candidates_for_wizard(
@@ -144,10 +175,22 @@ def create_flight_step3():
         dep_time, 
         route_info['flight_duration'],
         'Flight Attendant', 
-        10
+        50
     )
+
+    # Check for Shortages
+    warnings = {}
+    if len(pilots) < req_pilots:
+        warnings['pilots'] = f"Warning: Found only {len(pilots)} pilots. You need {req_pilots}."
     
-    return render_template('admin/wizard/step3_crew.html', pilots=pilots, attendants=attendants) 
+    if len(attendants) < req_attendants:
+        warnings['attendants'] = f"Warning: Found only {len(attendants)} attendants. You need {req_attendants}."
+    
+    return render_template('admin/wizard/step3_crew.html', 
+                           pilots=pilots, 
+                           attendants=attendants,
+                           constraints=constraints,
+                           warnings=warnings) 
 
 @admin_bp.route('/flights')
 def view_flights():

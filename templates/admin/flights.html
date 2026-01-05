@@ -1,53 +1,94 @@
 {% extends 'admin/base.html' %}
+{% set active_page = 'flights' %}
 
 {% block admin_content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>📋 Active Flights</h2>
-    <a href="{{ url_for('admin.create_flight_step1') }}" class="btn btn-primary">➕ New Flight</a>
+<div class="d-flex justify-content-between align-items-end mb-4 fade-in">
+    <div>
+        <h4 class="mb-1">Active Flight Operations</h4>
+        <p class="text-muted small mb-0">Overview of all scheduled and ongoing flights.</p>
+    </div>
+    <a href="{{ url_for('admin.create_flight_step1') }}" class="btn btn-primary shadow-sm">
+        <i class="bi bi-plus-lg"></i> New Flight
+    </a>
 </div>
 
-<div class="table-responsive">
-    <table class="table table-striped table-hover align-middle">
-        <thead class="table-dark">
-            <tr>
-                <th>#</th>
-                <th>Route</th>
-                <th>Departure</th>
-                <th>Arrival</th>
-                <th>Aircraft</th>
-                <th>Status</th>
-                <th>Price (Eco/Bus)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for flight in flights %}
-            <tr>
-                <td>{{ flight.flight_id }}</td>
-                <td>
-                    <strong>{{ flight.origin_airport }}</strong> &rarr; <strong>{{ flight.destination_airport
-                        }}</strong>
-                    <div class="text-muted small">{{ flight.flight_duration }}</div>
-                </td>
-                <td>{{ flight.departure_time }}</td>
-                <td>{{ flight.arrival_time }}</td>
-                <td>
-                    {% if flight.aircraft_model %}
-                    <span class="badge bg-success">{{ flight.aircraft_model }} ({{ flight.aircraft_size }})</span>
+<div class="card border-0 fade-in" style="animation-delay: 0.1s;">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle text-nowrap">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Flight & ID</th>
+                        <th>Route</th>
+                        <th>Schedule</th>
+                        <th>Aircraft</th>
+                        <th>Status</th>
+                        <th>Prices</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for flight in flights %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="bg-primary bg-opacity-10 p-2 rounded">
+                                    <i class="bi bi-airplane-fill text-primary"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold">#{{ flight.flight_id }}</div>
+                                    <small class="text-muted">International</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold">{{ flight.origin_airport }}</span>
+                                <i class="bi bi-arrow-right text-muted small"></i>
+                                <span class="fw-bold">{{ flight.destination_airport }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div>{{ flight.departure_time}}</div>
+                            <small class="text-muted">Duration: {{ flight.flight_duration }}</small>
+                        </td>
+                        <td>
+                            {% if flight.aircraft_id %}
+                            <span class="badge bg-secondary text-light">
+                                <i class="bi bi-jet-fighter"></i> ID: {{ flight.aircraft_id }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if flight.status == 'Scheduled' %}
+                            <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Scheduled</span>
+                            {% elif flight.status == 'Draft' %}
+                            <span class="badge bg-secondary">Draft</span>
+                            {% else %}
+                            <span class="badge bg-warning">{{ flight.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column gap-1">
+                                <small class="text-success fw-bold">${{ flight.economy_price }} Econ</small>
+                                <small class="text-info fw-bold">${{ flight.business_price }} Biz</small>
+                            </div>
+                        </td>
+                    </tr>
                     {% else %}
-                    <span class="badge bg-warning text-dark">Unassigned</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <span class="badge bg-info">{{ flight.flight_status }}</span>
-                </td>
-                <td>${{ flight.economy_price }} / ${{ flight.business_price }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="7" class="text-center py-4">No active flights found.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                            <p class="text-muted">No active flights found.</p>
+                            <a href="{{ url_for('admin.create_flight_step1') }}"
+                                class="btn btn-primary btn-sm mt-2">Schedule First Flight</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}
