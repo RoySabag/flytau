@@ -77,3 +77,4 @@ INSERT INTO Employees (ID_Number, First_name, Last_name, Phone_Number, City, Str
 (3018, 'Dail', 'Eighteen', '054-3000018', 'Kiryat Gat', 'Herzl', '18', '2023-01-18', 3, 'crew123'),
 (3019, 'Dail', 'Nineteen', '054-3000019', 'Kiryat Malakhi', 'Herzl', '19', '2023-01-19', 3, 'crew123'),
 (3020, 'Dail', 'Twenty', '054-3000020', 'Sderot', 'Herzl', '20', '2023-01-20', 3, 'crew123');
+COMMIT;

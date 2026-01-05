@@ -1,12 +1,22 @@
 from flask import Flask
-from app.routes import routes  # מייבא את הנתיבים החדשים (login, register)
+from app.classes.db_manager import DBManager
+# From main branch
+from app.routes import routes
+# From fix-login-system branch
+from app.models.daos.employee_dao import EmployeeDAO
+from app.routes.admin_routes import admin_bp
 
 app = Flask(__name__)
-app.secret_key = 'flytau_secret_key'  # מפתח הצפנה (חובה להתחברות)
+app.secret_key = 'flytau_secret_key' # Using key from main
 
-# השורה הכי חשובה: מחברת את דף ה-Login לאפליקציה!
-app.register_blueprint(routes)
+# Initialize DB (fix-login-system)
+db = DBManager()
+app.employee_dao = EmployeeDAO(db)
+
+# Register Blueprints
+app.register_blueprint(routes) # Main routes
+app.register_blueprint(admin_bp, url_prefix='/admin') # Admin routes from fix-login-system
 
 if __name__ == '__main__':
-    # שים לב: שיניתי לפורט 5000 (ברירת המחדל)
-    app.run(debug=True, port=5000)
+    # Using 5001 to avoid conflicts
+    app.run(debug=True, port=5001)

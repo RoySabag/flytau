@@ -1,4 +1,4 @@
-from app.classes.db_connector import DB
+from app.classes.db_manager import DB
 from datetime import datetime
 
 # --- מחלקה לטיפול בלקוחות רשומים (Customers) ---

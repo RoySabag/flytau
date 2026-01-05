@@ -1,0 +1,51 @@
+/* Specific styles for the Admin Login page */
+.login-container {
+    width: 320px;
+    margin: 80px auto;
+    padding: 25px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    background-color: #ffffff;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    text-align: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.login-container h2 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box; /* Crucial for layout */
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    background-color: #2c3e50; /* A more professional admin color */
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+}
+
+button:hover {
+    background-color: #34495e;
+}
+
+.error-msg {
+    color: #e74c3c;
+    margin-top: 15px;
+    font-size: 14px;
+}
