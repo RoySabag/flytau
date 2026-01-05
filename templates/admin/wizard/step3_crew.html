@@ -1,0 +1,60 @@
+{% extends 'admin/base.html' %}
+
+{% block admin_content %}
+<div class="mb-4">
+    <h4>Step 3: Select Crew</h4>
+    <div class="progress" style="height: 5px;">
+        <div class="progress-bar" role="progressbar" style="width: 100%;" aria-valuenow="100" aria-valuemin="0"
+            aria-valuemax="100"></div>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <!-- Pilots Column -->
+        <div class="col-md-6">
+            <h5 class="mb-3">Select Pilots (Need 2-3)</h5>
+            <div class="list-group">
+                {% for pilot in pilots %}
+                <label class="list-group-item list-group-item-action">
+                    <input class="form-check-input me-1" type="checkbox" name="pilots" value="{{ pilot.id_number }}">
+                    {{ pilot.first_name }} {{ pilot.last_name }}
+                    <div class="text-muted small">
+                        Matched: <span
+                            class="{{ 'text-success' if 'Perfect' in pilot.match_quality else 'text-secondary' }}">{{
+                            pilot.match_quality }}</span>
+                        {% if pilot.needs_transfer %}
+                        | ✈️ Needs Transfer ({{ pilot.transfer_flight_id or 'Unavailable' }})
+                        {% endif %}
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Attendants Column -->
+        <div class="col-md-6">
+            <h5 class="mb-3">Select Attendants (Need 3-6)</h5>
+            <div class="list-group">
+                {% for att in attendants %}
+                <label class="list-group-item list-group-item-action">
+                    <input class="form-check-input me-1" type="checkbox" name="attendants" value="{{ att.id_number }}">
+                    {{ att.first_name }} {{ att.last_name }}
+                    <div class="text-muted small">
+                        {{ att.match_quality }}
+                        {% if att.needs_transfer %}
+                        | ✈️ Needs Transfer
+                        {% endif %}
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between mt-5">
+        <a href="{{ url_for('admin.create_flight_step2') }}" class="btn btn-outline-secondary">&larr; Back</a>
+        <button type="submit" class="btn btn-success btn-lg">Finish & Schedule Flight 🎉</button>
+    </div>
+</form>
+{% endblock %}

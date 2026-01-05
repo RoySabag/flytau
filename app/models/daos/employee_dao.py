@@ -1,6 +1,3 @@
-from app.classes.db_manager import DB
-
-
 class EmployeeDAO:
     def __init__(self, db_manager):
         # We expect the DBManager instance here
@@ -36,3 +33,4 @@ class EmployeeDAO:
             print(f"Access Denied: Employee {employee_id} does not have Admin privileges.")
             return False
         return True
+        

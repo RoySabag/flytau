@@ -1,0 +1,53 @@
+{% extends 'admin/base.html' %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📋 Active Flights</h2>
+    <a href="{{ url_for('admin.create_flight_step1') }}" class="btn btn-primary">➕ New Flight</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>#</th>
+                <th>Route</th>
+                <th>Departure</th>
+                <th>Arrival</th>
+                <th>Aircraft</th>
+                <th>Status</th>
+                <th>Price (Eco/Bus)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for flight in flights %}
+            <tr>
+                <td>{{ flight.flight_id }}</td>
+                <td>
+                    <strong>{{ flight.origin_airport }}</strong> &rarr; <strong>{{ flight.destination_airport
+                        }}</strong>
+                    <div class="text-muted small">{{ flight.flight_duration }}</div>
+                </td>
+                <td>{{ flight.departure_time }}</td>
+                <td>{{ flight.arrival_time }}</td>
+                <td>
+                    {% if flight.aircraft_model %}
+                    <span class="badge bg-success">{{ flight.aircraft_model }} ({{ flight.aircraft_size }})</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">Unassigned</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge bg-info">{{ flight.flight_status }}</span>
+                </td>
+                <td>${{ flight.economy_price }} / ${{ flight.business_price }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="text-center py-4">No active flights found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

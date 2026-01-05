@@ -58,7 +58,11 @@ class DBManager:
                 result = cursor.fetchall()
             else:
                 connection.commit()
-                result = cursor.rowcount
+                # If it was an INSERT, return the ID
+                if query.strip().upper().startswith("INSERT"):
+                     result = {'rowcount': cursor.rowcount, 'lastrowid': cursor.lastrowid}
+                else:
+                     result = cursor.rowcount
 
         except Exception as e:
             print(f"❌ Query Error: {e}")
@@ -73,6 +77,20 @@ class DBManager:
 
         return result
 
+
+    def fetch_all(self, query, params=None):
+        connection = self.get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(query, params)
+            result = cursor.fetchall()
+            return result
+        except Exception as e:
+            print(f"Error executing query: {e}")
+            return []
+        finally:
+            cursor.close()
+            connection.close()
 
     def fetch_one(self, query, params=None):
         connection = self.get_connection()

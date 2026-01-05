@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar / Sub-navigation -->
+    <div class="col-md-3">
+        <div class="list-group mt-3">
+            <a href="{{ url_for('admin.dashboard') }}"
+                class="list-group-item list-group-item-action {% if active_page == 'dashboard' %}active{% endif %}">
+                Admin Dashboard
+            </a>
+            <a href="{{ url_for('admin.view_flights') }}" class="list-group-item list-group-item-action">View All
+                Flights</a>
+            <a href="{{ url_for('routes.logout') }}"
+                class="list-group-item list-group-item-action text-danger mt-5">Logout</a>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="col-md-9">
+        <div class="card mt-3">
+            <div class="card-body">
+                {% block admin_content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
