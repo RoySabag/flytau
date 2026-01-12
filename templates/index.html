@@ -1,31 +1,59 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>FlyTau System Check</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-        .box { border: 1px solid #ccc; padding: 20px; display: inline-block; border-radius: 10px; background-color: #f9f9f9; }
-        .success { color: green; font-weight: bold; }
-        .error { color: red; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h1>FlyTau System Check</h1>
-        <hr>
-        <p>Database Connection:
-            {% if db_status %}
-                <span class="success">Connected ✅</span>
-            {% else %}
-                <span class="error">Failed ❌</span>
-            {% endif %}
-        </p>
+{% extends "base.html" %}
 
-        <p>Admin Check:
-            <br><br>
-            <span style="font-size: 1.2em;">{{ admin_msg }}</span>
-        </p>
+{% block title %}FlyTau - Home{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold text-primary">Find Your Next Adventure</h1>
+        <p class="lead text-muted">Search for flights to your favorite destinations</p>
     </div>
-</body>
-</html>
+
+    <div class="card shadow-lg p-4 mx-auto" style="max-width: 800px; border-radius: 15px;">
+        <div class="card-body">
+            <form action="{{ url_for('booking.search_flights') }}" method="GET">
+                <div class="row g-3">
+                    <!-- Origin -->
+                    <div class="col-md-4">
+                        <label for="origin" class="form-label fw-bold">From</label>
+                        <select class="form-select" id="origin" name="origin" required>
+                            <option value="" selected disabled>Select Origin</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc }}">{{ loc }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Destination -->
+                    <div class="col-md-4">
+                        <label for="destination" class="form-label fw-bold">To</label>
+                        <select class="form-select" id="destination" name="destination" required>
+                            <option value="" selected disabled>Select Destination</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc }}">{{ loc }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Date -->
+                    <div class="col-md-4">
+                        <label for="date" class="form-label fw-bold">Departure Date</label>
+                        <input type="date" class="form-control" id="date" name="date" required>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg px-5 w-100">
+                        <i class="fas fa-search me-2"></i> Search Flights
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Optional: Set min date to today
+    document.getElementById('date').min = new Date().toISOString().split("T")[0];
+</script>
+{% endblock %}

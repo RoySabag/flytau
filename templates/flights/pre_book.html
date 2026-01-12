@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Start Booking - {{ flight.origin_airport }} to {{ flight.destination_airport }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card mx-auto shadow-sm" style="max-width: 600px;">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">Flight Details</h4>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <strong>Route:</strong> {{ flight.origin_airport }} <i class="fas fa-arrow-right"></i> {{
+                    flight.destination_airport }}<br>
+                    <strong>Date:</strong> {{ flight.departure_time }}
+                </div>
+                <div class="col-md-6 text-end">
+                    <strong>Aircraft:</strong> {{ flight.aircraft_model }}<br>
+                    <strong>Duration:</strong> {{ flight.flight_duration }}
+                </div>
+            </div>
+
+            <hr>
+
+            <form action="{{ url_for('booking.init_booking') }}" method="POST">
+                <input type="hidden" name="flight_id" value="{{ flight.flight_id }}">
+
+                <h5 class="mb-3">Who is flying?</h5>
+
+                <!-- Passenger Count -->
+                <div class="mb-3">
+                    <label for="passengers" class="form-label">Number of Passengers</label>
+                    <select class="form-select" id="passengers" name="passengers" required>
+                        {% for i in range(1, 10) %}
+                        <option value="{{ i }}">{{ i }} Passenger{% if i > 1 %}s{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Guest Email (if not logged in) -->
+                {% if not session.get('user_email') %}
+                <div class="mb-3">
+                    <label for="guest_email" class="form-label">Contact Email</label>
+                    <input type="email" class="form-control" id="guest_email" name="guest_email"
+                        placeholder="name@example.com" required>
+                    <div class="form-text">We'll send the ticket to this email.</div>
+                </div>
+                {% endif %}
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-success btn-lg">Choose Seats</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

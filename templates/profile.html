@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-user-circle me-2"></i> My Profile</h2>
+        <a href="{{ url_for('routes.logout') }}" class="btn btn-outline-danger">Logout</a>
+    </div>
+
+    <!-- User Info Card -->
+    <div class="card mb-5 shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title text-primary">Personal Details</h5>
+            <div class="row">
+                <div class="col-md-4"><strong>Name:</strong> {{ session.user_name }}</div>
+                <div class="col-md-4"><strong>Email:</strong> {{ session.user_email }}</div>
+                <!-- Add more if needed -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Section -->
+    <h3 class="mb-3"><i class="fas fa-ticket-alt me-2"></i> My Orders</h3>
+
+    {% if orders %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle shadow-sm bg-white rounded">
+            <thead class="table-light">
+                <tr>
+                    <th>Order Code</th>
+                    <th>Flight Route</th>
+                    <th>Departure</th>
+                    <th>Total Price</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td class="fw-bold text-primary">{{ order.unique_order_code }}</td>
+                    <td>
+                        {{ order.origin_airport }} <i class="fas fa-arrow-right small text-muted"></i> {{
+                        order.destination_airport }}<br>
+                        <small class="text-muted">{{ order.manufacturer }}</small>
+                    </td>
+                    <td>{{ order.departure_time }}</td>
+                    <td>${{ order.total_price }}</td>
+                    <td>
+                        {% if order.order_status == 'Paid' %}
+                        <span class="badge bg-success">Confirmed</span>
+                        {% elif order.order_status == 'Cancelled' %}
+                        <span class="badge bg-danger">Cancelled</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ order.order_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if order.order_status != 'Cancelled' %}
+                        <form action="{{ url_for('routes.cancel_order', order_id=order.order_id) }}" method="POST"
+                            onsubmit="return confirm('Are you sure you want to cancel this order?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted small">No actions</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center">
+        You haven't made any bookings yet. <a href="{{ url_for('routes.home') }}">Search for a flight!</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

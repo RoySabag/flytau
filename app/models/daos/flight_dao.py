@@ -156,3 +156,104 @@ class FlightDAO:
             return {"status": "success"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    # =================================================================
+    # חלק ד': בחירת מושבים (Booking)
+    # =================================================================
+
+    def get_flight_seats(self, flight_id):
+        """
+        מחזיר את מפת המושבים לטיסה ספציפית.
+        מחזיר רשימה של מושבים עם סטטוס (is_occupied) ומחיר (לפי סוג המחלקה).
+        """
+        # 1. שליפת פרטי הטיסה כדי לדעת איזה מטוס זה ומה המחירים
+        flight = self.get_flight_by_id(flight_id)
+        if not flight:
+            return None
+            
+        aircraft_id = flight['aircraft_id']
+        economy_price = flight['economy_price']
+        business_price = flight['business_price'] # אולי נרצה להציג מחיר לכל מושב
+
+        if not aircraft_id:
+            # מקרה קצה: הטיסה קיימת אך טרם שובץ מטוס
+            return []
+
+        # 2. שליפת כל המושבים של המטוס
+        # טבלה: seats (seat_id, aircraft_id, row_number, column_number, class)
+        query_seats = "SELECT * FROM seats WHERE aircraft_id = %s ORDER BY `row_number`, column_number"
+        all_seats = self.db.fetch_all(query_seats, (aircraft_id,))
+
+        # 3. שליפת המושבים התפוסים לטיסה זו
+        # טבלה: order_lines (flight_id, seat_id, ...)
+        # עדכון: מתעלמים מהזמנות שבוטלו (JOIN with orders)
+        # 3. שליפת המושבים התפוסים לטיסה זו
+        # טבלה: order_lines (flight_id, seat_id, ...)
+        # עדכון: מתעלמים מהזמנות שבוטלו (JOIN with orders)
+        query_occupied = """
+            SELECT ol.seat_id 
+            FROM order_lines ol
+            JOIN orders o ON ol.order_id = o.unique_order_code
+            WHERE ol.flight_id = %s AND o.order_status != 'Cancelled'
+        """
+        occupied_results = self.db.fetch_all(query_occupied, (flight_id,))
+        
+        # המרה ל-Set לחיפוש מהיר
+        occupied_ids = {row['seat_id'] for row in occupied_results}
+
+        # 4. מיזוג הנתונים
+        final_seats = []
+        for seat in all_seats:
+            seat_id = seat['seat_id']
+            is_occupied = seat_id in occupied_ids
+            
+            # הוספת שדות נוחים ל-UI
+            seat['is_occupied'] = is_occupied
+            seat['price'] = business_price if seat['class'] == 'Business' else economy_price
+            
+            final_seats.append(seat)
+
+        return final_seats
+
+    # =================================================================
+    # חלק ה': חיפוש טיסות (Search)
+    # =================================================================
+
+    def search_flights(self, origin, destination, date):
+        """
+        חיפוש טיסות לפי מוצא, יעד ותאריך.
+        מחזיר רשימה של טיסות מתאימות מה-DB.
+        """
+        try:
+            # השאילתה מבצעת JOIN כדי לקבל את כל המידע הדרוש לתוצאות החיפוש
+            # כולל בדיקה שהטיסה לא מבוטלת והתאריך תואם
+            query = """
+                SELECT 
+                    f.flight_id,
+                    f.departure_time,
+                    f.economy_price,
+                    f.business_price,
+                    f.flight_status,
+                    r.origin_airport,
+                    r.destination_airport,
+                    r.flight_duration,
+                    a.manufacturer,
+                    a.size
+                FROM flights f
+                JOIN routes r ON f.route_id = r.route_id
+                LEFT JOIN aircraft a ON f.aircraft_id = a.aircraft_id
+                WHERE r.origin_airport = %s
+                  AND r.destination_airport = %s
+                  AND DATE(f.departure_time) = %s
+                  AND f.flight_status != 'Cancelled'
+                ORDER BY f.departure_time ASC
+            """
+            
+            # אם התאריך מגיע כמחרוזת, לוודא שהוא בפורמט YYYY-MM-DD
+            # (בדרך כלל ה-HTML input type="date" שולח כך)
+            
+            return self.db.fetch_all(query, (origin, destination, date))
+
+        except Exception as e:
+            print(f"❌ Error searching flights: {e}")
+            return []

@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Select Seats - {{ flight.origin_airport }} to {{ flight.destination_airport }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Select {{ quantity }} Seat{% if quantity > 1 %}s{% endif %}</h2>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="card-title mb-0">{{ flight.origin_airport }} <i class="fas fa-arrow-right"></i> {{
+                    flight.destination_airport }}</h5>
+                <small class="text-muted">{{ flight.departure_time }}</small>
+            </div>
+            <div class="text-end">
+                <span id="selected-count" class="badge bg-secondary fs-6">0 / {{ quantity }} Selected</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seat Map Legend -->
+    <div class="d-flex justify-content-center mb-4 gap-4">
+        <div class="d-flex align-items-center">
+            <div class="seat-legend available me-2"></div> Available
+        </div>
+        <div class="d-flex align-items-center">
+            <div class="seat-legend occupied me-2"></div> Occupied
+        </div>
+        <div class="d-flex align-items-center">
+            <div class="seat-legend selected me-2"></div> Selected
+        </div>
+        <div class="d-flex align-items-center">
+            <div class="seat-legend business me-2"></div> Business
+        </div>
+    </div>
+
+    <form id="seatForm" method="POST" action="{{ url_for('booking.create_order') }}">
+        <!-- Hidden Data: Flight ID, Quantity, Guest Email -->
+        <input type="hidden" name="flight_id" value="{{ flight.flight_id }}">
+        <input type="hidden" name="quantity" value="{{ quantity }}">
+        {% if guest_email %}
+        <input type="hidden" name="guest_email" value="{{ guest_email }}">
+        {% endif %}
+
+        <div class="seat-map-container mx-auto bg-light p-4 rounded border" style="max-width: 800px; overflow-x: auto;">
+
+            <!-- Front of Plane -->
+            <div class="text-center text-muted mb-3"><i class="fas fa-plane-up fa-2x"></i><br>Front</div>
+
+            {% if seats_by_row %}
+            {% for row_num in seats_by_row|sort %}
+            <div class="d-flex justify-content-center mb-2 flughafen-row">
+                <!-- Row Number -->
+                <div class="row-indicator me-3 d-flex align-items-center justify-content-center fw-bold text-secondary"
+                    style="width: 30px;">
+                    {{ row_num }}
+                </div>
+
+                <!-- Seats -->
+                {% for seat in seats_by_row[row_num] %}
+                <!-- Aisle simulation -->
+                {% if loop.index0 == 3 and seats_by_row[row_num]|length > 4 %}
+                <div class="aisle mx-3"></div>
+                {% endif %}
+
+                <div class="seat-wrapper mx-1">
+                    <!-- Checkbox for multi-select -->
+                    <input type="checkbox" name="selected_seats" id="seat_{{ seat.seat_id }}" value="{{ seat.seat_id }}"
+                        data-price="{{ seat.price }}" class="btn-check seat-checkbox" {% if seat.is_occupied
+                        %}disabled{% endif %}>
+
+                    <label for="seat_{{ seat.seat_id }}"
+                        class="seat-box btn btn-outline-secondary d-flex align-items-center justify-content-center
+                                              {% if seat.class == 'Business' %}border-warning text-warning{% endif %}
+                                              {% if seat.is_occupied %}disabled bg-secondary text-white border-secondary{% endif %}"
+                        data-bs-toggle="tooltip" title="{{ seat.class }} - ${{ seat.price }}">
+                        {{ seat.column_number }}
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="alert alert-warning text-center">No seat map available for this aircraft.</div>
+            {% endif %}
+
+            <!-- Submit -->
+            <div class="text-center mt-5">
+                <h4 class="mb-3">Total: $<span id="total-price">0</span></h4>
+                <button type="submit" id="submitBtn" class="btn btn-success btn-lg px-5" disabled>
+                    Book Now
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Custom CSS & JS -->
+<style>
+    .seat-box {
+        width: 40px;
+        height: 40px;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+
+    .seat-box:hover:not(.disabled) {
+        transform: scale(1.1);
+        cursor: pointer;
+    }
+
+    .btn-check:checked+.seat-box {
+        background-color: #198754;
+        color: white;
+        border-color: #198754;
+    }
+
+    .btn-check:not(:checked)+.seat-box.border-warning {
+        background-color: #fff3cd;
+    }
+
+    .btn-check:checked+.seat-box.border-warning {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: black;
+    }
+
+    /* Active Business */
+
+
+    .seat-legend {
+        width: 20px;
+        height: 20px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .seat-legend.available {
+        background-color: white;
+    }
+
+    .seat-legend.occupied {
+        background-color: #6c757d;
+    }
+
+    .seat-legend.selected {
+        background-color: #198754;
+    }
+
+    .seat-legend.business {
+        background-color: #fff3cd;
+        border-color: #ffc107;
+    }
+</style>
+
+<script>
+    const MAX_SEATS = {{ quantity }};
+    const checkboxes = document.querySelectorAll('.seat-checkbox');
+    const countDisplay = document.getElementById('selected-count');
+    const submitBtn = document.getElementById('submitBtn');
+    const priceDisplay = document.getElementById('total-price');
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', function () {
+            const checked = document.querySelectorAll('.seat-checkbox:checked');
+
+            // Limit selection
+            if (checked.length > MAX_SEATS) {
+                this.checked = false;
+                alert(`You can only select ${MAX_SEATS} seats.`);
+                return;
+            }
+
+            // Update UI
+            countDisplay.innerText = `${checked.length} / ${MAX_SEATS} Selected`;
+
+            // Enable submit if limit reached
+            submitBtn.disabled = (checked.length !== MAX_SEATS);
+
+            // Calc Total Price
+            let total = 0;
+            checked.forEach(box => {
+                total += parseFloat(box.getAttribute('data-price'));
+            });
+            priceDisplay.innerText = total;
+        });
+    });
+</script>
+{% endblock %}

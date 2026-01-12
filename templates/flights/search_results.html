@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Flight Results{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center mb-4">Flight Results</h2>
+    <div class="text-center mb-5 text-muted">
+        Showing flights from <strong>{{ search_params.origin }}</strong> to <strong>{{ search_params.destination
+            }}</strong> on <strong>{{ search_params.date }}</strong>
+    </div>
+
+    {% if flights %}
+    <div class="row">
+        {% for flight in flights %}
+        <div class="col-md-8 mx-auto mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="row align-items-center">
+
+                        <!-- Times & Route -->
+                        <div class="col-md-6">
+                            <h5 class="card-title text-primary mb-1">
+                                {{ flight.departure_time.strftime('%H:%M') }}
+                                <i class="fas fa-plane small text-muted mx-2"></i>
+                                <!-- Arrival calculation not strictly in DAO here, simple UI display -->
+                                <span class="text-muted small">(Duration: {{ flight.flight_duration }})</span>
+                            </h5>
+                            <p class="mb-0 text-secondary">
+                                {{ flight.origin_airport }} <i class="fas fa-long-arrow-alt-right"></i> {{
+                                flight.destination_airport }}
+                            </p>
+                            <small class="text-muted">{{ flight.manufacturer }} {{ flight.size }}</small>
+                        </div>
+
+                        <!-- Price & Action -->
+                        <div class="col-md-6 text-end">
+                            <span class="badge bg-light text-dark border me-2">Eco: ${{ flight.economy_price
+                                }}</span>
+                            <span class="badge bg-warning text-dark border">Biz: ${{ flight.business_price }}</span>
+                        </div>
+                        <a href="{{ url_for('booking.pre_book', flight_id=flight.flight_id) }}"
+                            class="btn btn-primary px-4">
+                            Book Now
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info text-center w-50 mx-auto">
+    <i class="fas fa-search me-2"></i> No flights found for this route and date.
+    <br>
+    <a href="{{ url_for('routes.home') }}" class="alert-link">Try a different search</a>.
+</div>
+{% endif %}
+</div>
+{% endblock %}
