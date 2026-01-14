@@ -33,4 +33,16 @@ class EmployeeDAO:
             print(f"Access Denied: Employee {employee_id} does not have Admin privileges.")
             return False
         return True
+
+    def add_employee(self, id_number, first_name, last_name, phone_number, city, street, house_no, start_date, role_id, password, long_haul=0):
+        """
+        Inserts a new employee into the database.
+        """
+        query = """
+            INSERT INTO Employees 
+            (ID_Number, First_name, Last_name, Phone_Number, City, Street, House_No, Employment_Start_Date, Role_id, Login_Password, Long_Haul_Certified)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        params = (id_number, first_name, last_name, phone_number, city, street, house_no, start_date, role_id, password, long_haul)
+        return self.db.execute_query(query, params)
         

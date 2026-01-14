@@ -1,0 +1,193 @@
+{% extends 'admin/base.html' %}
+{% set active_page = 'statistics' %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4 fade-in">
+    <div>
+        <h4 class="mb-1">Business Statistics</h4>
+        <p class="text-muted small mb-0">Real-time insights and performance metrics.</p>
+    </div>
+    <!-- KPI Card for Fleet Occupancy -->
+    <div class="card border-0 shadow-sm bg-primary text-white" style="min-width: 250px;">
+        <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between">
+            <div>
+                <h2 class="mb-0 fw-bold">{{ kpi_occupancy }}%</h2>
+                <small class="text-white-50">Avg Fleet Occupancy</small>
+            </div>
+            <i class="bi bi-pie-chart-fill fs-1 opacity-50"></i>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Chart B: Revenue by Manufacturer -->
+    <div class="col-md-6 fade-in" style="animation-delay: 0.1s;">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-0 fw-bold">Revenue by Aircraft Manufacturer</div>
+            <div class="card-body">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Chart C: Employee Flight Hours -->
+    <div class="col-md-6 fade-in" style="animation-delay: 0.2s;">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-0 fw-bold">Employee Flight Hours (Short vs Long Haul)</div>
+            <div class="card-body">
+                <canvas id="employeeHoursChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Chart D: Monthly Cancellation Rate -->
+    <div class="col-12 fade-in" style="animation-delay: 0.3s;">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-0 fw-bold">Monthly Cancellation Rate Trend</div>
+            <div class="card-body">
+                <canvas id="cancellationChart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Table E: Monthly Aircraft Activity -->
+<div class="card border-0 shadow-sm fade-in mb-4" style="animation-delay: 0.4s;">
+    <div class="card-header bg-transparent border-0 fw-bold">Monthly Aircraft Activity Report</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle text-nowrap table-striped">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Aircraft ID</th>
+                        <th>Month</th>
+                        <th class="text-center">Flights Executed</th>
+                        <th class="text-center">Cancelled</th>
+                        <th class="text-center">Utilization</th>
+                        <th>Dominant Route</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in aircraft_activity %}
+                    <tr>
+                        <td class="ps-4 fw-bold">#{{ row.aircraft_id }}</td>
+                        <td>{{ row.month }}</td>
+                        <td class="text-center">{{ row.flights_executed }}</td>
+                        <td class="text-center">
+                            {% if row.flights_cancelled > 0 %}
+                            <span class="text-danger fw-bold">{{ row.flights_cancelled }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <div class="progress flex-grow-1" style="height: 6px; max-width: 60px;">
+                                    <div class="progress-bar bg-info" role="progressbar"
+                                        style="width: {{ row.utilization_percent }}%"></div>
+                                </div>
+                                <small class="fw-bold">{{ row.utilization_percent }}%</small>
+                            </div>
+                        </td>
+                        <td>
+                            {% if row.dominant_route %}
+                            <span class="badge bg-light text-dark border">{{ row.dominant_route }}</span>
+                            {% else %}
+                            <span class="text-muted small">N/A</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-3 text-muted">No activity data available.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // --- Data Preparation from Backend ---
+
+    // 1. Revenue Chart Data
+    // We need to transform list of dicts [{manufacturer, size, seat_class, total_revenue}, ...] 
+    // into labels (Manufacturers) and Datasets (Economy, Business)
+    const revData = {{ rev_by_manufacturer | tojson }};
+
+    const manufacturers = [...new Set(revData.map(d => d.manufacturer))];
+    const economyData = manufacturers.map(m => {
+        const item = revData.find(d => d.manufacturer === m && d.seat_class === 'Economy');
+        return item ? item.total_revenue : 0;
+    });
+    const businessData = manufacturers.map(m => {
+        const item = revData.find(d => d.manufacturer === m && d.seat_class === 'Business');
+        return item ? item.total_revenue : 0;
+    });
+
+    const ctxRev = document.getElementById('revenueChart').getContext('2d');
+    new Chart(ctxRev, {
+        type: 'bar',
+        data: {
+            labels: manufacturers,
+            datasets: [
+                { label: 'Economy', data: economyData, backgroundColor: '#3498db' },
+                { label: 'Business', data: businessData, backgroundColor: '#2ecc71' }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: { x: { stacked: true }, y: { stacked: true } }
+        }
+    });
+
+    // 2. Employee Hours Chart Data
+    const empData = {{ emp_hours | tojson }};
+    const roles = empData.map(d => d.role);
+    const shortHours = empData.map(d => d.short_flight_hours);
+    const longHours = empData.map(d => d.long_flight_hours);
+
+    const ctxEmp = document.getElementById('employeeHoursChart').getContext('2d');
+    new Chart(ctxEmp, {
+        type: 'bar',
+        data: {
+            labels: roles,
+            datasets: [
+                { label: 'Short Haul (hrs)', data: shortHours, backgroundColor: '#f1c40f' },
+                { label: 'Long Haul (hrs)', data: longHours, backgroundColor: '#9b59b6' }
+            ]
+        },
+        options: { responsive: true }
+    });
+
+    // 3. Cancellation Rate Chart Data
+    const cancelData = {{ cancel_rates | tojson }};
+    const months = cancelData.map(d => d.month);
+    const rates = cancelData.map(d => d.cancellation_rate);
+
+    const ctxCancel = document.getElementById('cancellationChart').getContext('2d');
+    new Chart(ctxCancel, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Cancellation Rate (%)',
+                data: rates,
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, max: 100 } }
+        }
+    });
+</script>
+{% endblock %}

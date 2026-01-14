@@ -3,6 +3,7 @@ from app.classes.db_manager import DB
 from app.models.daos.flight_dao import FlightDAO
 from app.models.daos.aircrafts_dao import AircraftDAO
 from app.models.daos.crewscheduler import CrewScheduler
+from app.models.daos.statistics_dao import StatisticsDAO
 from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
@@ -11,6 +12,7 @@ admin_bp = Blueprint('admin', __name__)
 flight_dao = FlightDAO(DB)
 aircraft_dao = AircraftDAO(DB)
 crew_scheduler = CrewScheduler(DB)
+stats_dao = StatisticsDAO(DB)
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -196,3 +198,93 @@ def create_flight_step3():
 def view_flights():
     flights = flight_dao.get_all_active_flights()
     return render_template('admin/flights.html', flights=flights)
+
+@admin_bp.route('/cancel_flight/<int:flight_id>', methods=['POST'])
+def cancel_flight(flight_id):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin.login'))
+        
+    result = flight_dao.cancel_flight_transaction(flight_id)
+    
+    if result['status'] == 'success':
+        flash(result['message'], "success")
+    else:
+        flash(f"Error: {result['message']}", "danger")
+        
+    return redirect(url_for('admin.view_flights'))
+
+@admin_bp.route('/add_crew', methods=['GET', 'POST'])
+def add_crew():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin.login'))
+        
+    if request.method == 'POST':
+        # Extract form data
+        id_number = request.form.get('id_number')
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        phone_number = request.form.get('phone_number')
+        city = request.form.get('city')
+        street = request.form.get('street')
+        house_no = request.form.get('house_no')
+        start_date = request.form.get('start_date')
+        role_id = request.form.get('role_id')
+        password = request.form.get('password')
+        
+        # Checkbox returns '1' if checked, else None
+        long_haul = 1 if request.form.get('long_haul') else 0
+
+        # Basic Validation
+        if not all([id_number, first_name, last_name, role_id]):
+            flash("Error: Missing required fields.", "danger")
+            return redirect(url_for('admin.add_crew'))
+
+        if role_id == '1':
+             flash("Error: Creating new Admin users is not allowed.", "danger")
+             return redirect(url_for('admin.add_crew'))
+
+        # Use the employee_dao from current_app as initialized in run.py
+        # Or better, use the instance attached to the connection/blueprint logic if available.
+        # Looking at login route: employee_dao = current_app.employee_dao
+        
+        try:
+            employee_dao = current_app.employee_dao
+            # Check if ID exists (would ideally be in DAO but catching DB error is ok too)
+            existing = employee_dao.get_employee_by_id(id_number)
+            if existing:
+                flash(f"Error: Employee with ID {id_number} already exists.", "danger")
+                return redirect(url_for('admin.add_crew'))
+
+            employee_dao.add_employee(
+                id_number, first_name, last_name, phone_number, 
+                city, street, house_no, start_date, role_id, 
+                password, long_haul
+            )
+            flash(f"Employee {first_name} {last_name} added successfully!", "success")
+            return redirect(url_for('admin.dashboard'))
+            
+        except Exception as e:
+            flash(f"Error adding employee: {str(e)}", "danger")
+            return redirect(url_for('admin.add_crew'))
+
+    return render_template('admin/add_crew.html', active_page='add_crew')
+
+@admin_bp.route('/dashboard/statistics')
+def statistics():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin.login'))
+        
+    # Fetch Data
+    kpi_occupancy = stats_dao.get_avg_fleet_occupancy()
+    rev_by_manufacturer = stats_dao.get_revenue_by_manufacturer()
+    emp_hours = stats_dao.get_employee_flight_hours()
+    cancel_rates = stats_dao.get_monthly_cancellation_rate()
+    aircraft_activity = stats_dao.get_monthly_aircraft_activity()
+    
+    return render_template('admin/statistics.html', 
+                           active_page='statistics',
+                           kpi_occupancy=kpi_occupancy,
+                           rev_by_manufacturer=rev_by_manufacturer,
+                           emp_hours=emp_hours,
+                           cancel_rates=cancel_rates,
+                           aircraft_activity=aircraft_activity)

@@ -83,9 +83,10 @@ class FlightDAO:
 
     def get_all_active_flights(self):
         """
-        שולף את כל הטיסות הפעילות/עתידיות להצגה בטבלה למנהל.
-        כולל JOIN כדי להראות שמות ערים ודגמי מטוסים.
+        שולף את כל הטיסות להצגה בטבלה למנהל.
+        כולל עדכון דינמי של הסטטוסים (Scheduled, On air, Landed) לפי הזמן הנוכחי.
         """
+        # 1. Fetch ALL flights (including Cancelled)
         query = """
             SELECT 
                 f.flight_id,
@@ -111,10 +112,56 @@ class FlightDAO:
             JOIN routes r ON f.route_id = r.route_id
             LEFT JOIN aircraft a ON f.aircraft_id = a.aircraft_id
             
-            WHERE f.flight_status != 'Cancelled'
             ORDER BY f.departure_time ASC
         """
-        return self.db.fetch_all(query)
+        flights = self.db.fetch_all(query)
+        if not flights:
+            return []
+
+        now = datetime.now()
+        updated_flights = []
+
+        for flight in flights:
+            current_status = flight['flight_status']
+            
+            # If manually cancelled, we don't touch it based on time
+            if current_status == 'Cancelled':
+                updated_flights.append(flight)
+                continue
+
+            # Calculate proper time-based status
+            # flight['departure_time'] is likely datetime, confirm type in logic if needed
+            # flight['flight_duration'] is likely timedelta
+            
+            dep = flight['departure_time']
+            if isinstance(dep, str): # Safety conversion
+                 dep = datetime.strptime(dep, '%Y-%m-%d %H:%M:%S')
+
+            duration = flight['flight_duration']
+            if isinstance(duration, str):
+                 t = datetime.strptime(duration, "%H:%M:%S")
+                 duration = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+
+            arrival = dep + duration
+            
+            new_status = 'Scheduled'
+            if now > arrival:
+                new_status = 'Landed'
+            elif now >= dep:
+                new_status = 'On air'
+            
+            if new_status != current_status:
+                try:
+                    # Update DB
+                    self.update_flight_status(flight['flight_id'], new_status)
+                    flight['flight_status'] = new_status
+                except Exception as e:
+                    print(f"Error updating status for flight {flight['flight_id']}: {e}")
+            
+            flight['arrival_time'] = arrival # Ensure valid datetime object for template
+            updated_flights.append(flight)
+
+        return updated_flights
 
     def get_flight_by_id(self, flight_id):
         """
@@ -145,6 +192,67 @@ class FlightDAO:
             return {"status": "success"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    def cancel_flight_transaction(self, flight_id):
+        """
+        Cancels a flight and refunds all associated orders IF departure is > 72 hours away.
+        Performs atomic updates.
+        """
+        conn = self.db.get_connection()
+        if not conn:
+            return {"status": "error", "message": "DB connection failed"}
+            
+        cursor = conn.cursor(dictionary=True)
+        try:
+            # 1. Check Flight Exists & Time Constraint
+            # We lock the row for update to prevent race conditions
+            cursor.execute("SELECT departure_time, flight_status FROM flights WHERE flight_id = %s FOR UPDATE", (flight_id,))
+            flight = cursor.fetchone()
+            
+            if not flight:
+                conn.rollback()
+                return {"status": "error", "message": "Flight not found"}
+                
+            if flight['flight_status'] == 'Cancelled':
+                conn.rollback()
+                return {"status": "error", "message": "Flight is already cancelled"}
+
+            dep_time = flight['departure_time']
+            if isinstance(dep_time, str):
+                dep_time = datetime.strptime(dep_time, '%Y-%m-%d %H:%M:%S')
+
+            time_diff = dep_time - datetime.now()
+            hours_diff = time_diff.total_seconds() / 3600
+            
+            if hours_diff < 72:
+                conn.rollback()
+                return {"status": "error", "message": "Cannot cancel flight less than 72 hours before departure."}
+
+            # 2. Update Flight Status
+            cursor.execute("UPDATE flights SET flight_status = 'Cancelled' WHERE flight_id = %s", (flight_id,))
+            
+            # 3. Update Associated Orders (Cancel & Refund)
+            # Find all active orders for this flight
+            cursor.execute("SELECT unique_order_code FROM orders WHERE flight_id = %s AND order_status != 'Cancelled'", (flight_id,))
+            active_orders = cursor.fetchall()
+            
+            if active_orders:
+                # Update status to Cancelled and Price to 0 (Full Refund)
+                cursor.execute("""
+                    UPDATE orders 
+                    SET order_status = 'Cancelled', total_price = 0 
+                    WHERE flight_id = %s AND order_status != 'Cancelled'
+                """, (flight_id,))
+            
+            conn.commit()
+            return {"status": "success", "message": f"Flight cancelled. {len(active_orders)} orders refunded."}
+
+        except Exception as e:
+            conn.rollback()
+            return {"status": "error", "message": str(e)}
+        finally:
+            cursor.close()
+            conn.close()
             
     def update_prices(self, flight_id, eco_price, bus_price):
         """
@@ -245,7 +353,7 @@ class FlightDAO:
                 WHERE r.origin_airport = %s
                   AND r.destination_airport = %s
                   AND DATE(f.departure_time) = %s
-                  AND f.flight_status != 'Cancelled'
+                  AND f.flight_status = 'Scheduled'
                 ORDER BY f.departure_time ASC
             """
             
