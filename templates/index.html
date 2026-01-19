@@ -2,14 +2,20 @@
 
 {% block title %}FlyTau - Home{% endblock %}
 
-{% block content %}
-<div class="container mt-5">
-    <div class="text-center mb-5">
-        <h1 class="display-4 fw-bold text-primary">Find Your Next Adventure</h1>
-        <p class="lead text-muted">Search for flights to your favorite destinations</p>
+{% block hero %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="display-3 fw-bold">Find Your Next Adventure</h1>
+        <p class="lead">Search for flights to your favorite destinations</p>
     </div>
+</div>
+{% endblock %}
 
-    <div class="card shadow-lg p-4 mx-auto" style="max-width: 800px; border-radius: 15px;">
+{% block content %}
+<div class="mt-4">
+    {% if not session.get('admin_logged_in') %}
+    <div class="card shadow-lg p-4 mx-auto"
+        style="max-width: 800px; border-radius: 15px; margin-top: -80px; position: relative; z-index: 2;">
         <div class="card-body">
             <form action="{{ url_for('booking.search_flights') }}" method="GET">
                 <div class="row g-3">
@@ -48,6 +54,78 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center mx-auto" style="max-width: 600px;">
+        <h4><i class="bi bi-shield-lock-fill"></i> Admin Mode</h4>
+        <p>You are logged in as an Administrator.</p>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-primary">Go to Dashboard</a>
+    </div>
+    {% endif %}
+
+    <!-- Flight Schedule Section -->
+    <div class="mt-5 mb-5">
+        <h2 class="text-center mb-4 text-secondary"><i class="fas fa-calendar-alt me-2"></i>Flight Schedule</h2>
+        <div class="table-responsive shadow-sm" style="border-radius: 10px; overflow: hidden;">
+            <table class="table table-hover align-middle mb-0 text-center bg-white">
+                <thead class="bg-primary text-white">
+                    <tr>
+                        <th class="py-3">Flight No.</th>
+                        <th class="py-3">Route</th>
+                        <th class="py-3">Date & Time</th>
+                        <th class="py-3">Aircraft</th>
+                        <th class="py-3">Status</th>
+                        <th class="py-3">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in flights %}
+                    <tr>
+                        <td class="fw-bold text-muted">#{{ f.flight_id }}</td>
+                        <td>
+                            <div class="d-flex align-items-center justify-content-center">
+                                <span class="fw-bold">{{ f.origin_airport }}</span>
+                                <i class="fas fa-plane mx-2 text-primary"></i>
+                                <span class="fw-bold">{{ f.destination_airport }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div>{{ f.departure_time.strftime('%Y-%m-%d') }}</div>
+                            <small class="text-muted">{{ f.departure_time.strftime('%H:%M') }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">{{ f.aircraft_model }}</span>
+                        </td>
+                        <td>
+                            {% if f.flight_status == 'Scheduled' %}
+                            <span class="badge bg-primary">Scheduled</span>
+                            {% elif f.flight_status == 'On air' %}
+                            <span class="badge bg-success"><i class="fas fa-plane-departure me-1"></i>On Air</span>
+                            {% elif f.flight_status == 'Landed' %}
+                            <span class="badge bg-secondary">Landed</span>
+                            {% else %}
+                            <span class="badge bg-danger">Cancelled</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if f.flight_status == 'Scheduled' %}
+                            <a href="{{ url_for('booking.pre_book', flight_id=f.flight_id) }}"
+                                class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                Book
+                            </a>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled>Closed</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-muted py-4">No flights currently scheduled.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

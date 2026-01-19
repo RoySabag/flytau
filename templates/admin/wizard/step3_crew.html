@@ -35,112 +35,153 @@
             </div>
         </div>
 
-        <form method="POST">
-            <div class="row g-4">
-                <!-- Pilots Column -->
-                <div class="col-md-6">
-                    <div class="card h-100 border-0">
-                        <div
-                            class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center pt-4 px-4">
-                            <h5 class="mb-0 d-flex align-items-center gap-2"><i
-                                    class="bi bi-person-badge text-primary"></i> Select Pilots</h5>
-                            <span class="badge bg-secondary">{{ constraints.pilots }} Needed</span>
-                        </div>
-                        <div class="card-body p-0">
-
-                            {% if warnings and warnings.pilots %}
-                            <div class="alert alert-danger m-3 d-flex align-items-center gap-2">
-                                <i class="bi bi-x-circle-fill"></i> {{ warnings.pilots }}
-                            </div>
-                            {% endif %}
-
-                            <div class="list-group list-group-flush p-3">
-                                {% for pilot in pilots %}
-                                <label
-                                    class="list-group-item list-group-item-action d-flex align-items-start gap-3 p-3 border rounded mb-2">
-                                    <input class="form-check-input mt-1" type="checkbox" name="pilots"
-                                        value="{{ pilot.id_number }}">
-                                    <div class="w-100">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span class="fw-bold">{{ pilot.first_name }} {{ pilot.last_name }}</span>
-                                            <span
-                                                class="badge {{ 'bg-success' if 'Perfect' in pilot.match_quality else 'bg-secondary' }}">
-                                                {{ pilot.match_quality }}
-                                            </span>
-                                        </div>
-                                        {% if pilot.needs_transfer %}
-                                        <div class="small text-warning mt-1"><i class="bi bi-arrow-repeat"></i> Needs
-                                            Transfer (Flight #{{ pilot.transfer_flight_id or 'Unknown' }})</div>
-                                        {% else %}
-                                        <div class="small text-success mt-1"><i class="bi bi-check2"></i> Ready at
-                                            Location</div>
-                                        {% endif %}
-                                    </div>
-                                </label>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Attendants Column -->
-                <div class="col-md-6">
-                    <div class="card h-100 border-0">
-                        <div
-                            class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center pt-4 px-4">
-                            <h5 class="mb-0 d-flex align-items-center gap-2"><i
-                                    class="bi bi-people-fill text-accent"></i> Select Attendants</h5>
-                            <span class="badge bg-secondary">{{ constraints.attendants }} Needed</span>
-                        </div>
-                        <div class="card-body p-0">
-
-                            {% if warnings and warnings.attendants %}
-                            <div class="alert alert-danger m-3 d-flex align-items-center gap-2">
-                                <i class="bi bi-x-circle-fill"></i> {{ warnings.attendants }}
-                            </div>
-                            {% endif %}
-
-                            <div class="list-group list-group-flush p-3">
-                                {% for att in attendants %}
-                                <label
-                                    class="list-group-item list-group-item-action d-flex align-items-start gap-3 p-3 border rounded mb-2">
-                                    <input class="form-check-input mt-1" type="checkbox" name="attendants"
-                                        value="{{ att.id_number }}">
-                                    <div class="w-100">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span class="fw-bold">{{ att.first_name }} {{ att.last_name }}</span>
-                                            <small class="text-muted">{{ att.match_quality }}</small>
-                                        </div>
-                                        {% if att.needs_transfer %}
-                                        <div class="small text-warning mt-1"><i class="bi bi-arrow-repeat"></i> Needs
-                                            Transfer</div>
-                                        {% else %}
-                                        <div class="small text-success mt-1"><i class="bi bi-check2"></i> Ready at
-                                            Location</div>
-                                        {% endif %}
-                                    </div>
-                                </label>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="d-flex justify-content-between mt-5 pb-5">
-                <a href="{{ url_for('admin.create_flight_step2') }}" class="btn btn-outline-secondary px-4">Back</a>
-
-                {% if warnings and (warnings.pilots or warnings.attendants) %}
-                <button type="button" class="btn btn-danger btn-lg px-5 cursor-not-allowed opacity-75" disabled>
-                    <i class="bi bi-slash-circle me-2"></i> Fix Crew Shortage
-                </button>
-                {% else %}
-                <button type="submit" class="btn btn-success btn-lg px-5 shadow-neon">
-                    <i class="bi bi-rocket-takeoff-fill me-2"></i> Finish & Launch
-                </button>
-                {% endif %}
-            </div>
-        </form>
     </div>
+
+    <form method="POST">
+        <!-- Pricing Section -->
+        <div class="card mb-4 border-0">
+            <div class="card-header bg-transparent border-0 pt-4 px-4">
+                <h5 class="mb-0 text-success"><i class="bi bi-tag-fill me-2"></i>Flight Pricing</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Economy Class Price</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-muted">$</span>
+                            <input type="number" class="form-control" name="economy_price" required
+                                placeholder="Example: 150">
+                        </div>
+                    </div>
+
+                    {% if constraints.size == 'Big' %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-warning">Business Class Price</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-muted">$</span>
+                            <input type="number" class="form-control" name="business_price" required
+                                placeholder="Example: 450">
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-muted text-decoration-line-through">Business Class
+                            Price</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-muted">$</span>
+                            <input type="text" class="form-control text-muted" value="Not Available (Small Aircraft)"
+                                disabled>
+                        </div>
+                        <small class="text-muted">Business class is not available on small aircraft.</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <!-- Pilots Column -->
+        <div class="col-md-6">
+            <div class="card h-100 border-0">
+                <div
+                    class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center pt-4 px-4">
+                    <h5 class="mb-0 d-flex align-items-center gap-2"><i class="bi bi-person-badge text-primary"></i>
+                        Select Pilots</h5>
+                    <span class="badge bg-secondary">{{ constraints.pilots }} Needed</span>
+                </div>
+                <div class="card-body p-0">
+
+                    {% if warnings and warnings.pilots %}
+                    <div class="alert alert-danger m-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-x-circle-fill"></i> {{ warnings.pilots }}
+                    </div>
+                    {% endif %}
+
+                    <div class="list-group list-group-flush p-3">
+                        {% for pilot in pilots %}
+                        <label
+                            class="list-group-item list-group-item-action d-flex align-items-start gap-3 p-3 border rounded mb-2">
+                            <input class="form-check-input mt-1" type="checkbox" name="pilots"
+                                value="{{ pilot.id_number }}">
+                            <div class="w-100">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold">{{ pilot.first_name }} {{ pilot.last_name }}</span>
+                                    <span
+                                        class="badge {{ 'bg-success' if 'Perfect' in pilot.match_quality else 'bg-secondary' }}">
+                                        {{ pilot.match_quality }}
+                                    </span>
+                                </div>
+                                {% if pilot.needs_transfer %}
+                                <div class="small text-warning mt-1"><i class="bi bi-arrow-repeat"></i> Needs
+                                    Transfer (Flight #{{ pilot.transfer_flight_id or 'Unknown' }})</div>
+                                {% else %}
+                                <div class="small text-success mt-1"><i class="bi bi-check2"></i> Ready at
+                                    Location</div>
+                                {% endif %}
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendants Column -->
+        <div class="col-md-6">
+            <div class="card h-100 border-0">
+                <div
+                    class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center pt-4 px-4">
+                    <h5 class="mb-0 d-flex align-items-center gap-2"><i class="bi bi-people-fill text-accent"></i>
+                        Select Attendants</h5>
+                    <span class="badge bg-secondary">{{ constraints.attendants }} Needed</span>
+                </div>
+                <div class="card-body p-0">
+
+                    {% if warnings and warnings.attendants %}
+                    <div class="alert alert-danger m-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-x-circle-fill"></i> {{ warnings.attendants }}
+                    </div>
+                    {% endif %}
+
+                    <div class="list-group list-group-flush p-3">
+                        {% for att in attendants %}
+                        <label
+                            class="list-group-item list-group-item-action d-flex align-items-start gap-3 p-3 border rounded mb-2">
+                            <input class="form-check-input mt-1" type="checkbox" name="attendants"
+                                value="{{ att.id_number }}">
+                            <div class="w-100">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold">{{ att.first_name }} {{ att.last_name }}</span>
+                                    <small class="text-muted">{{ att.match_quality }}</small>
+                                </div>
+                                {% if att.needs_transfer %}
+                                <div class="small text-warning mt-1"><i class="bi bi-arrow-repeat"></i> Needs
+                                    Transfer</div>
+                                {% else %}
+                                <div class="small text-success mt-1"><i class="bi bi-check2"></i> Ready at
+                                    Location</div>
+                                {% endif %}
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+</div>
+
+<div class="d-flex justify-content-between mt-5 pb-5">
+    <a href="{{ url_for('admin.create_flight_step2') }}" class="btn btn-outline-secondary px-4">Back</a>
+
+    {% if warnings and (warnings.pilots or warnings.attendants) %}
+    <button type="button" class="btn btn-danger btn-lg px-5 cursor-not-allowed opacity-75" disabled>
+        <i class="bi bi-slash-circle me-2"></i> Fix Crew Shortage
+    </button>
+    {% else %}
+    <button type="submit" class="btn btn-success btn-lg px-5 shadow-neon">
+        <i class="bi bi-rocket-takeoff-fill me-2"></i> Finish & Launch
+    </button>
+    {% endif %}
+</div>
+</form>
+</div>
 </div>
 {% endblock %}

@@ -1,16 +1,28 @@
 from datetime import datetime, timedelta
 
 class FlightDAO:
+    """
+    Data Access Object for Flight Operations.
+
+    This class serves as the central hub for managing flight data, including:
+    1.  **Flight Creation**: Assigning routes, times, and initial pricing.
+    2.  **Status Management**: Automatically updating statuses based on real-time checks (Scheduled -> On Air -> Landed).
+    3.  **Booking Logic**: Handling seat availability and "Fully Booked" states.
+    4.  **Admin Operations**: Initializing cancellations and refunds.
+    5.  **Search**: Complex filtering for user flight discovery.
+    """
+
     def __init__(self, db_manager):
         self.db = db_manager
 
     # =================================================================
-    # חלק א': יצירת טיסה חדשה (לוגיקה מעודכנת - ערים ומחירים)
+    # Part A: Flight Creation & Initialization
     # =================================================================
 
     def get_all_locations(self):
         """
-        מחזיר רשימה של כל הערים הקיימות במערכת (עבור Dropdown ב-UI).
+        Retrieves a list of all unique cities/airports available in the system.
+        Used to populate dropdown menus in the Search and Create Flight forms.
         """
         query = """
             SELECT DISTINCT origin_airport as location FROM routes
@@ -22,8 +34,8 @@ class FlightDAO:
 
     def get_route_details_by_airports(self, origin, destination):
         """
-        מחזיר את פרטי המסלול (ID ומשך זמן) לפי מוצא ויעד.
-        משמש לחישוב זמן נחיתה בזמן אמת ב-UI.
+        Fetches route specifications (ID, Duration) for a given origin-destination pair.
+        Used for calculating arrival times and validating flight creation.
         """
         query = """
             SELECT route_id, flight_duration, route_type 
@@ -33,7 +45,7 @@ class FlightDAO:
         result = self.db.fetch_one(query, (origin, destination))
         
         if result:
-            # המרת משך הטיסה לאובייקט נוח אם צריך
+            # Convert string duration to timedelta object for calculations
             duration = result['flight_duration']
             if isinstance(duration, str):
                 t = datetime.strptime(duration, "%H:%M:%S")
@@ -43,19 +55,22 @@ class FlightDAO:
 
     def create_flight(self, origin, destination, departure_time, economy_price, business_price):
         """
-        יוצר טיסה חדשה ב-DB.
-        מקבל שמות ערים (שהמנהל בחר), מוצא את ה-route_id לבד, ומכניס את המחירים.
+        Creates a new flight record in the database.
+        
+        Logic:
+        1.  Resolves the `route_id` automatically based on origin/destination.
+        2.  Sets the initial status to 'Scheduled'.
+        3.  Note: Aircraft assignment happens in a separate step by the admin.
         """
-        # 1. מציאת ה-ID של הנתיב
+        # 1. Resolve Route ID
         route_info = self.get_route_details_by_airports(origin, destination)
         if not route_info:
             return {"status": "error", "message": f"No route found from {origin} to {destination}"}
         
         route_id = route_info['route_id']
 
-        # 2. שמירה ב-DB
+        # 2. Insert into DB
         try:
-            # המרה ל-datetime במידת הצורך
             if isinstance(departure_time, str):
                 departure_time = datetime.strptime(departure_time, '%Y-%m-%dT%H:%M') 
 
@@ -64,11 +79,10 @@ class FlightDAO:
                 (route_id, aircraft_id, departure_time, economy_price, business_price, flight_status)
                 VALUES (%s, NULL, %s, %s, %s, 'Scheduled')
             """
-            # aircraft_id הוא NULL בהתחלה - המנהל ישבץ אותו בנפרד
+            
             params = (route_id, departure_time, economy_price, business_price)
             res = self.db.execute_query(query, params)
             
-            # Check for dictionary result (from our DBManager update)
             if isinstance(res, dict) and 'lastrowid' in res:
                 return {"status": "success", "message": "Flight created successfully", "flight_id": res['lastrowid']}
             
@@ -78,15 +92,21 @@ class FlightDAO:
             return {"status": "error", "message": str(e)}
 
     # =================================================================
-    # חלק ב': צפייה בטיסות (עבור הדשבורד)
+    # Part B: Flight Retrieval & Status Updates
     # =================================================================
 
-    def get_all_active_flights(self):
+    def get_all_active_flights(self, flight_id=None, status_filter=None):
         """
-        שולף את כל הטיסות להצגה בטבלה למנהל.
-        כולל עדכון דינמי של הסטטוסים (Scheduled, On air, Landed) לפי הזמן הנוכחי.
+        Retrieves flights, typically for the Admin Dashboard or Main Schedule.
+        
+        **Dynamic Status Logic**:
+        This method automatically updates flight statuses based on the current time:
+        - Now < Departure: 'Scheduled'
+        - Departure <= Now <= Arrival: 'On Air'
+        - Now > Arrival: 'Landed'
+        - Checks for 'Fully Booked' capacity only for Scheduled flights.
         """
-        # 1. Fetch ALL flights (including Cancelled)
+        # 1. Fetch Flights with Joins for Readability
         query = """
             SELECT 
                 f.flight_id,
@@ -95,77 +115,128 @@ class FlightDAO:
                 f.economy_price,
                 f.business_price,
                 
-                -- פרטי נתיב
+                -- Route Details
                 r.origin_airport,
                 r.destination_airport,
                 r.flight_duration,
                 
-                -- פרטי מטוס (אם שובץ)
+                -- Aircraft Details
                 f.aircraft_id,
                 a.manufacturer AS aircraft_model,
                 a.size AS aircraft_size,
                 
-                -- חישוב זמן נחיתה
+                -- Calculated Arrival (SQL side baseline)
                 ADDTIME(f.departure_time, r.flight_duration) as arrival_time
 
             FROM flights f
             JOIN routes r ON f.route_id = r.route_id
             LEFT JOIN aircraft a ON f.aircraft_id = a.aircraft_id
-            
-            ORDER BY f.departure_time ASC
         """
-        flights = self.db.fetch_all(query)
+        
+        params = []
+        if flight_id:
+            query += " WHERE f.flight_id = %s"
+            params.append(flight_id)
+            
+        query += " ORDER BY f.departure_time ASC"
+        
+        flights = self.db.fetch_all(query, tuple(params))
         if not flights:
             return []
 
         now = datetime.now()
-        updated_flights = []
+        filtered_flights = []
 
         for flight in flights:
             current_status = flight['flight_status']
             
-            # If manually cancelled, we don't touch it based on time
-            if current_status == 'Cancelled':
-                updated_flights.append(flight)
-                continue
+            # Skip logic for Cancelled flights - they are finalized.
+            if current_status not in ['Cancelled', 'System Cancelled']:
+                
+                # --- Time-Based Status Update ---
+                dep = flight['departure_time']
+                if isinstance(dep, str):
+                     dep = datetime.strptime(dep, '%Y-%m-%d %H:%M:%S')
+    
+                duration = flight['flight_duration']
+                if isinstance(duration, str):
+                     t = datetime.strptime(duration, "%H:%M:%S")
+                     duration = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+    
+                arrival = dep + duration
+                
+                new_status = 'Scheduled'
+                if now > arrival:
+                    new_status = 'Landed'
+                elif now >= dep:
+                    new_status = 'On air'
+                
+                if new_status != current_status and current_status != 'Fully Booked': 
+                    # Note: We let the Fully Booked check below handle overrides if needed, 
+                    # but generally time status takes precedence over capacity if flight has started.
+                    if current_status == 'Fully Booked' and new_status == 'Scheduled':
+                         pass # Keep Fully Booked if it hasn't taken off yet
+                    else:
+                        try:
+                            self.update_flight_status(flight['flight_id'], new_status)
+                            flight['flight_status'] = new_status
+                        except Exception as e:
+                            print(f"Error updating status: {e}")
+                
+                # --- Capacity Check (Fully Booked) ---
+                # Only runs if flight is pre-departure.
+                if flight['flight_status'] in ['Scheduled', 'Fully Booked']:
+                    is_full = self._is_flight_full(flight['flight_id'])
+                    
+                    final_status = 'Fully Booked' if is_full else 'Scheduled'
+                    
+                    if final_status != flight['flight_status']:
+                        self.update_flight_status(flight['flight_id'], final_status)
+                        flight['flight_status'] = final_status
 
-            # Calculate proper time-based status
-            # flight['departure_time'] is likely datetime, confirm type in logic if needed
-            # flight['flight_duration'] is likely timedelta
-            
-            dep = flight['departure_time']
-            if isinstance(dep, str): # Safety conversion
-                 dep = datetime.strptime(dep, '%Y-%m-%d %H:%M:%S')
+                flight['arrival_time'] = arrival
 
-            duration = flight['flight_duration']
-            if isinstance(duration, str):
-                 t = datetime.strptime(duration, "%H:%M:%S")
-                 duration = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+            # --- Apply Filter ---
+            if status_filter and status_filter != 'All':
+                if flight['flight_status'] != status_filter:
+                    continue 
+            
+            filtered_flights.append(flight)
 
-            arrival = dep + duration
-            
-            new_status = 'Scheduled'
-            if now > arrival:
-                new_status = 'Landed'
-            elif now >= dep:
-                new_status = 'On air'
-            
-            if new_status != current_status:
-                try:
-                    # Update DB
-                    self.update_flight_status(flight['flight_id'], new_status)
-                    flight['flight_status'] = new_status
-                except Exception as e:
-                    print(f"Error updating status for flight {flight['flight_id']}: {e}")
-            
-            flight['arrival_time'] = arrival # Ensure valid datetime object for template
-            updated_flights.append(flight)
+        return filtered_flights
 
-        return updated_flights
+    def _is_flight_full(self, flight_id):
+        """
+        Internal Helper: Checks if specific flight is at 100% capacity.
+        Compares Total Seats (from Aircraft) vs. Sold Tickets (from Active Orders).
+        """
+        # 1. Get Total Capacity
+        query_capacity = """
+            SELECT COUNT(*) as total 
+            FROM seats s
+            JOIN flights f ON s.aircraft_id = f.aircraft_id
+            WHERE f.flight_id = %s
+        """
+        res_cap = self.db.fetch_one(query_capacity, (flight_id,))
+        total = res_cap['total'] if res_cap else 0
+        
+        if total == 0: return False 
+
+        # 2. Get Occupied Count
+        query_occupied = """
+            SELECT COUNT(*) as occupied
+            FROM order_lines ol
+            JOIN orders o ON ol.unique_order_code = o.unique_order_code
+            WHERE ol.flight_id = %s AND o.order_status IN ('active', 'completed')
+        """
+        res_occ = self.db.fetch_one(query_occupied, (flight_id,))
+        occupied = res_occ['occupied'] if res_occ else 0
+        
+        return occupied >= total
 
     def get_flight_by_id(self, flight_id):
         """
-        שליפת טיסה בודדת (למשל לדף 'פרטי טיסה' או לשיבוץ צוות).
+        Retrieves a single flight's comprehensive details.
         """
         query = """
             SELECT f.*, 
@@ -179,13 +250,11 @@ class FlightDAO:
         return self.db.fetch_one(query, (flight_id,))
 
     # =================================================================
-    # חלק ג': עדכונים ופעולות ניהול
+    # Part C: Admin Actions (Updates & Cancellations)
     # =================================================================
 
     def update_flight_status(self, flight_id, new_status):
-        """
-        עדכון סטטוס (למשל: ביטול טיסה, המראה, נחיתה).
-        """
+        """Directly updates the status column in the database."""
         try:
             query = "UPDATE flights SET flight_status = %s WHERE flight_id = %s"
             self.db.execute_query(query, (new_status, flight_id))
@@ -195,8 +264,15 @@ class FlightDAO:
 
     def cancel_flight_transaction(self, flight_id):
         """
-        Cancels a flight and refunds all associated orders IF departure is > 72 hours away.
-        Performs atomic updates.
+        Executes a Company Cancellation logic (Admin cancels flight).
+        
+        **Rules:**
+        1.  Must be > 72 hours before departure.
+        2.  Updates flight status to 'Cancelled'.
+        3.  Refunding:
+            - Finds all active orders.
+            - Updates them to 'system_cancelled'.
+            - Sets their price to 0 (Full Refund).
         """
         conn = self.db.get_connection()
         if not conn:
@@ -204,8 +280,7 @@ class FlightDAO:
             
         cursor = conn.cursor(dictionary=True)
         try:
-            # 1. Check Flight Exists & Time Constraint
-            # We lock the row for update to prevent race conditions
+            # 1. Lock and Fetch Flight Step
             cursor.execute("SELECT departure_time, flight_status FROM flights WHERE flight_id = %s FOR UPDATE", (flight_id,))
             flight = cursor.fetchone()
             
@@ -217,6 +292,7 @@ class FlightDAO:
                 conn.rollback()
                 return {"status": "error", "message": "Flight is already cancelled"}
 
+            # 2. Validate Time Window (72 Hours)
             dep_time = flight['departure_time']
             if isinstance(dep_time, str):
                 dep_time = datetime.strptime(dep_time, '%Y-%m-%d %H:%M:%S')
@@ -228,20 +304,19 @@ class FlightDAO:
                 conn.rollback()
                 return {"status": "error", "message": "Cannot cancel flight less than 72 hours before departure."}
 
-            # 2. Update Flight Status
+            # 3. Cancel Flight
             cursor.execute("UPDATE flights SET flight_status = 'Cancelled' WHERE flight_id = %s", (flight_id,))
             
-            # 3. Update Associated Orders (Cancel & Refund)
-            # Find all active orders for this flight
+            # 4. Process Refunds
             cursor.execute("SELECT unique_order_code FROM orders WHERE flight_id = %s AND order_status != 'Cancelled'", (flight_id,))
             active_orders = cursor.fetchall()
             
             if active_orders:
-                # Update status to Cancelled and Price to 0 (Full Refund)
+                # Update status to system_cancelled and Price to 0 to indicate full refund
                 cursor.execute("""
                     UPDATE orders 
-                    SET order_status = 'Cancelled', total_price = 0 
-                    WHERE flight_id = %s AND order_status != 'Cancelled'
+                    SET order_status = 'system_cancelled', total_price = 0 
+                    WHERE flight_id = %s AND order_status = 'active'
                 """, (flight_id,))
             
             conn.commit()
@@ -255,9 +330,7 @@ class FlightDAO:
             conn.close()
             
     def update_prices(self, flight_id, eco_price, bus_price):
-        """
-        עדכון מחירים לטיסה קיימת.
-        """
+        """Updates ticket prices for an existing flight."""
         try:
             query = "UPDATE flights SET economy_price = %s, business_price = %s WHERE flight_id = %s"
             self.db.execute_query(query, (eco_price, bus_price, flight_id))
@@ -266,56 +339,54 @@ class FlightDAO:
             return {"status": "error", "message": str(e)}
 
     # =================================================================
-    # חלק ד': בחירת מושבים (Booking)
+    # Part D: Seat Management & Booking
     # =================================================================
 
     def get_flight_seats(self, flight_id):
         """
-        מחזיר את מפת המושבים לטיסה ספציפית.
-        מחזיר רשימה של מושבים עם סטטוס (is_occupied) ומחיר (לפי סוג המחלקה).
+        Generates a "Seat Map" for the UI.
+        Combinations static aircraft seat configuration with dynamic booking data.
+        
+        Returns a list of seats with:
+        - Position (Row/Col)
+        - Class (Economy/Business)
+        - Price (Resolved from flight settings)
+        - `is_occupied` flag.
         """
-        # 1. שליפת פרטי הטיסה כדי לדעת איזה מטוס זה ומה המחירים
+        # 1. Fetch Flight Context
         flight = self.get_flight_by_id(flight_id)
         if not flight:
             return None
             
         aircraft_id = flight['aircraft_id']
         economy_price = flight['economy_price']
-        business_price = flight['business_price'] # אולי נרצה להציג מחיר לכל מושב
+        business_price = flight['business_price']
 
         if not aircraft_id:
-            # מקרה קצה: הטיסה קיימת אך טרם שובץ מטוס
+            # Setup incomplete
             return []
 
-        # 2. שליפת כל המושבים של המטוס
-        # טבלה: seats (seat_id, aircraft_id, row_number, column_number, class)
+        # 2. Fetch All Seats in Aircraft Configuration
         query_seats = "SELECT * FROM seats WHERE aircraft_id = %s ORDER BY `row_number`, column_number"
         all_seats = self.db.fetch_all(query_seats, (aircraft_id,))
 
-        # 3. שליפת המושבים התפוסים לטיסה זו
-        # טבלה: order_lines (flight_id, seat_id, ...)
-        # עדכון: מתעלמים מהזמנות שבוטלו (JOIN with orders)
-        # 3. שליפת המושבים התפוסים לטיסה זו
-        # טבלה: order_lines (flight_id, seat_id, ...)
-        # עדכון: מתעלמים מהזמנות שבוטלו (JOIN with orders)
+        # 3. Identify Occupied Seats
+        # Excludes cancelled orders from occupancy check.
         query_occupied = """
             SELECT ol.seat_id 
             FROM order_lines ol
-            JOIN orders o ON ol.order_id = o.unique_order_code
+            JOIN orders o ON ol.unique_order_code = o.unique_order_code
             WHERE ol.flight_id = %s AND o.order_status != 'Cancelled'
         """
         occupied_results = self.db.fetch_all(query_occupied, (flight_id,))
-        
-        # המרה ל-Set לחיפוש מהיר
         occupied_ids = {row['seat_id'] for row in occupied_results}
 
-        # 4. מיזוג הנתונים
+        # 4. Merge and Format
         final_seats = []
         for seat in all_seats:
             seat_id = seat['seat_id']
             is_occupied = seat_id in occupied_ids
             
-            # הוספת שדות נוחים ל-UI
             seat['is_occupied'] = is_occupied
             seat['price'] = business_price if seat['class'] == 'Business' else economy_price
             
@@ -324,17 +395,15 @@ class FlightDAO:
         return final_seats
 
     # =================================================================
-    # חלק ה': חיפוש טיסות (Search)
+    # Part E: User Search
     # =================================================================
 
     def search_flights(self, origin, destination, date):
         """
-        חיפוש טיסות לפי מוצא, יעד ותאריך.
-        מחזיר רשימה של טיסות מתאימות מה-DB.
+        Executes a flight search based on user criteria.
+        Returns detailed flight info including aircraft and pricing.
         """
         try:
-            # השאילתה מבצעת JOIN כדי לקבל את כל המידע הדרוש לתוצאות החיפוש
-            # כולל בדיקה שהטיסה לא מבוטלת והתאריך תואם
             query = """
                 SELECT 
                     f.flight_id,
@@ -357,11 +426,8 @@ class FlightDAO:
                 ORDER BY f.departure_time ASC
             """
             
-            # אם התאריך מגיע כמחרוזת, לוודא שהוא בפורמט YYYY-MM-DD
-            # (בדרך כלל ה-HTML input type="date" שולח כך)
-            
             return self.db.fetch_all(query, (origin, destination, date))
 
         except Exception as e:
-            print(f"❌ Error searching flights: {e}")
+            print(f"Error searching flights: {e}")
             return []

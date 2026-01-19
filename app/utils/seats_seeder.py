@@ -4,7 +4,7 @@ import os
 # Adjust path to find 'app' package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from app.classes.db_manager import DB
+from database.db_manager import DB
 
 # --- תצורת מטוסים (Hardcoded Layouts) ---
 # Each aircraft has a unique configuration for Rows and Columns.

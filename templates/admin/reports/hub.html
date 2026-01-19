@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Management Reports{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('admin.dashboard') }}" class="text-decoration-none text-muted me-3">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Header Section -->
+    <div class="card bg-dark text-white shadow-lg mb-5 border-0"
+        style="border-radius: 15px; background-color: #0f172a !important;">
+        <div class="card-body p-5 text-center">
+            <div class="mb-3">
+                <span class="badge bg-primary p-3 rounded-circle"
+                    style="width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center;">
+                    <i class="bi bi-bar-chart-fill fs-3"></i>
+                </span>
+            </div>
+            <h1 class="display-5 fw-bold mb-2">Management Reports</h1>
+            <p class="text-white-50 lead mb-0">Select a report to view detailed analytics and performance charts.</p>
+        </div>
+    </div>
+
+    <!-- Reports List -->
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="list-group shadow-sm" style="border-radius: 12px; overflow: hidden;">
+
+                <!-- Report 1 -->
+                <a href="{{ url_for('admin.report_occupancy') }}"
+                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-bottom">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-4 fw-bold text-primary opacity-50 me-4">1</span>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">Average Flight Occupancy</h5>
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </a>
+
+                <!-- Report 2 -->
+                <a href="{{ url_for('admin.report_revenue') }}"
+                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-bottom">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-4 fw-bold text-info opacity-50 me-4">2</span>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">Total Revenue Analysis</h5>
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </a>
+
+                <!-- Report 3 -->
+                <a href="{{ url_for('admin.report_hours') }}"
+                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-bottom">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-4 fw-bold text-success opacity-50 me-4">3</span>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">Employee Flight Hours</h5>
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </a>
+
+                <!-- Report 4 -->
+                <a href="{{ url_for('admin.report_cancellations') }}"
+                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-bottom">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-4 fw-bold text-danger opacity-50 me-4">4</span>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">Cancellation Rate by Month</h5>
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </a>
+
+                <!-- Report 5 -->
+                <a href="{{ url_for('admin.report_activity') }}"
+                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-0">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-4 fw-bold text-warning opacity-50 me-4">5</span>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">Aircraft Activity Summary</h5>
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </a>
+
+            </div>
+
+            <div class="text-center mt-4 text-muted small">
+                <i class="bi bi-lock-fill me-1"></i> CONFIDENTIAL INTERNAL DATA
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

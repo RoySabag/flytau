@@ -1,30 +1,24 @@
 from flask import Blueprint, render_template, request, session, redirect, url_for, current_app, flash
-from app.classes.db_manager import DB
-from app.models.daos.flight_dao import FlightDAO
-from app.models.daos.aircrafts_dao import AircraftDAO
-from app.models.daos.crewscheduler import CrewScheduler
-from app.models.daos.statistics_dao import StatisticsDAO
+from database.db_manager import DBManager
+from app.services.flight_service import FlightService
+from app.services.auth_service import AuthService
 from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
 
-# Initialize DAOs
-flight_dao = FlightDAO(DB)
-aircraft_dao = AircraftDAO(DB)
-crew_scheduler = CrewScheduler(DB)
-stats_dao = StatisticsDAO(DB)
+# Initialize Services
+db = DBManager()
+flight_service = FlightService(db)
+auth_service = AuthService(db)
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    # גישה ל-DAO דרך האפליקציה הנוכחית (עוקף את המעגל)
-    employee_dao = current_app.employee_dao
-
     if request.method == 'POST':
         emp_id = request.form.get('employee_id')
-        password = request.form.get('password')  # בעתיד נוסיף בדיקת סיסמה
+        password = request.form.get('password')
 
-        # שימוש ב-DAO ובדיקת Admin
-        if employee_dao.get_employee_by_id(emp_id) and employee_dao.is_admin(emp_id):
+        # Use Service
+        if auth_service.login_admin(emp_id, password):
             session['admin_logged_in'] = True
             session['admin_id'] = emp_id
             return redirect(url_for('admin.dashboard'))
@@ -44,13 +38,11 @@ def create_flight_step1():
         session['wizard_data'] = {
             'origin': request.form.get('origin'),
             'destination': request.form.get('destination'),
-            'departure_time': request.form.get('departure_time'),
-            'economy_price': request.form.get('economy_price'),
-            'business_price': request.form.get('business_price')
+            'departure_time': request.form.get('departure_time')
         }
         return redirect(url_for('admin.create_flight_step2'))
 
-    locations = flight_dao.get_all_locations()
+    locations = flight_service.get_all_locations()
     return render_template('admin/wizard/step1_route.html', locations=locations)
 
 # --- Wizard Step 2: Aircraft Selection ---
@@ -64,22 +56,19 @@ def create_flight_step2():
         session['wizard_data'] = wizard_data 
         return redirect(url_for('admin.create_flight_step3'))
 
-    # Calculate flight details to find available aircrafts
-    route_info = flight_dao.get_route_details_by_airports(wizard_data['origin'], wizard_data['destination'])
+    # Logic moved to Service (partially, some orchestration remains here or can be moved deeper)
+    # Keeping route orchestration simple: call Service getters
+    route_info = flight_service.get_route_details(wizard_data['origin'], wizard_data['destination'])
     if not route_info:
         flash("Invalid Route selected", "danger")
         return redirect(url_for('admin.create_flight_step1'))
     
-    # Calculate Landing Time
-    dep_time = datetime.strptime(wizard_data['departure_time'], '%Y-%m-%dT%H:%M')
-    flight_duration = route_info['flight_duration']
-    
-    # Get available aircrafts using the new WIZARD method (fixes logic bug)
-    available_aircrafts = aircraft_dao.get_available_aircrafts_for_wizard(
+    # Get available aircrafts
+    available_aircrafts = flight_service.get_available_aircrafts(
         wizard_data['origin'], 
         wizard_data['destination'], 
-        dep_time, 
-        flight_duration
+        wizard_data['departure_time'], 
+        route_info['flight_duration']
     )
     
     return render_template('admin/wizard/step2_aircraft.html', 
@@ -92,15 +81,16 @@ def create_flight_step3():
     wizard_data = session.get('wizard_data', {})
     if not wizard_data: return redirect(url_for('admin.create_flight_step1'))
 
-    # Determine Constraints based on Aircraft
-    aircraft_id = wizard_data.get('aircraft_id')
     req_pilots = 2
-    req_attendants = 3
+    req_attendants = 3  # Start with small defaults
     aircraft_size = 'Small'
 
-    if aircraft_id:
-        aircraft = aircraft_dao.get_aircraft_by_id(aircraft_id)
-        if aircraft and aircraft['size'] == 'Big':
+    # Re-fetch aircraft info to determine constraints (could be cached in session, but safe to fetch)
+    if wizard_data.get('aircraft_id'):
+        # We need DAO access here or add method to service?
+        # Service has access to AircraftDAO.
+        aircraft = flight_service.aircraft_dao.get_aircraft_by_id(wizard_data.get('aircraft_id'))
+        if aircraft and str(aircraft['size']).lower() == 'big':
             aircraft_size = 'Big'
             req_pilots = 3
             req_attendants = 6
@@ -115,78 +105,61 @@ def create_flight_step3():
         pilot_ids = request.form.getlist('pilots')
         attendant_ids = request.form.getlist('attendants')
         
-        # --- Strict Validation Block ---
+        # Validation
         if len(pilot_ids) != req_pilots:
-            flash(f"Error: {aircraft_size} aircraft requires exactly {req_pilots} pilots. You selected {len(pilot_ids)}.", "danger")
+            flash(f"Error: {aircraft_size} aircraft requires exactly {req_pilots} pilots.", "danger")
             return redirect(url_for('admin.create_flight_step3'))
             
         if len(attendant_ids) != req_attendants:
-            flash(f"Error: {aircraft_size} aircraft requires exactly {req_attendants} attendants. You selected {len(attendant_ids)}.", "danger")
+            flash(f"Error: {aircraft_size} aircraft requires exactly {req_attendants} attendants.", "danger")
             return redirect(url_for('admin.create_flight_step3'))
-        # -------------------------------
 
+        # Prepare Final Data
         wizard_data['pilot_ids'] = pilot_ids
         wizard_data['attendant_ids'] = attendant_ids
-        session['wizard_data'] = wizard_data
         
-        # 1. Create Flight
-        res = flight_dao.create_flight(
-            wizard_data['origin'], 
-            wizard_data['destination'], 
-            wizard_data['departure_time'], 
-            wizard_data['economy_price'], 
-            wizard_data['business_price']
-        )
+        economy_price = request.form.get('economy_price')
+        business_price = request.form.get('business_price')
+        if aircraft_size != 'Big': business_price = 0
         
-        flight_id = res.get('flight_id')
-        if not flight_id:
-             flash(f"Error creating flight: {res.get('message', 'Unknown Error')}", "danger")
+        wizard_data['economy_price'] = economy_price
+        wizard_data['business_price'] = business_price
+        
+        # Execute Creation via Service
+        result = flight_service.create_full_flight(wizard_data)
+
+        if result.get('status') == 'success':
+            flash(f"Flight {result['flight_id']} Scheduled Successfully!", "success")
+            return redirect(url_for('admin.view_flights'))
+        else:
+             flash(f"Error creating flight: {result.get('message')}", "danger")
              return redirect(url_for('admin.create_flight_step1'))
 
-        # 2. Assign Aircraft
-        if wizard_data.get('aircraft_id'):
-            aircraft_dao.assign_aircraft_to_flight(flight_id, wizard_data['aircraft_id'])
-
-        # 3. Assign Crew
-        crew_scheduler.assign_selected_crew(
-            flight_id, 
-            pilot_ids, 
-            attendant_ids
-        )
-
-        flash(f"Flight {flight_id} Scheduled Successfully with Crew & Aircraft! ✈️", "success")
-        return redirect(url_for('admin.view_flights'))
-
-    # GET: Show Candidates (Stateless - No Draft Flight!)
-    # Need route details again
-    route_info = flight_dao.get_route_details_by_airports(wizard_data['origin'], wizard_data['destination'])
-    dep_time = datetime.strptime(wizard_data['departure_time'], '%Y-%m-%dT%H:%M')
+    # GET: Show Candidates
+    route_info = flight_service.get_route_details(wizard_data['origin'], wizard_data['destination'])
     
-    pilots = crew_scheduler.get_candidates_for_wizard(
+    pilots = flight_service.get_crew_candidates(
         wizard_data['origin'], 
         wizard_data['destination'], 
-        dep_time, 
+        wizard_data['departure_time'], 
         route_info['flight_duration'],
-        'Pilot', 
-        50
+        'Pilot'
     )
     
-    attendants = crew_scheduler.get_candidates_for_wizard(
+    attendants = flight_service.get_crew_candidates(
         wizard_data['origin'], 
         wizard_data['destination'], 
-        dep_time, 
+        wizard_data['departure_time'], 
         route_info['flight_duration'],
-        'Flight Attendant', 
-        50
+        'Flight Attendant'
     )
 
     # Check for Shortages
     warnings = {}
     if len(pilots) < req_pilots:
-        warnings['pilots'] = f"Warning: Found only {len(pilots)} pilots. You need {req_pilots}."
-    
+        warnings['pilots'] = f"Warning: Found only {len(pilots)} pilots."
     if len(attendants) < req_attendants:
-        warnings['attendants'] = f"Warning: Found only {len(attendants)} attendants. You need {req_attendants}."
+        warnings['attendants'] = f"Warning: Found only {len(attendants)} attendants."
     
     return render_template('admin/wizard/step3_crew.html', 
                            pilots=pilots, 
@@ -196,15 +169,22 @@ def create_flight_step3():
 
 @admin_bp.route('/flights')
 def view_flights():
-    flights = flight_dao.get_all_active_flights()
-    return render_template('admin/flights.html', flights=flights)
+    flight_id = request.args.get('flight_id')
+    status = request.args.get('status')
+    
+    flights = flight_service.get_active_flights(flight_id, status)
+    
+    return render_template('admin/flights.html', 
+                           flights=flights, 
+                           current_id=flight_id, 
+                           current_status=status)
 
 @admin_bp.route('/cancel_flight/<int:flight_id>', methods=['POST'])
 def cancel_flight(flight_id):
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin.login'))
         
-    result = flight_dao.cancel_flight_transaction(flight_id)
+    result = flight_service.cancel_flight(flight_id)
     
     if result['status'] == 'success':
         flash(result['message'], "success")
@@ -228,36 +208,29 @@ def add_crew():
         street = request.form.get('street')
         house_no = request.form.get('house_no')
         start_date = request.form.get('start_date')
-        role_id = request.form.get('role_id')
+        role_type = request.form.get('role_id')
         password = request.form.get('password')
-        
-        # Checkbox returns '1' if checked, else None
         long_haul = 1 if request.form.get('long_haul') else 0
 
         # Basic Validation
-        if not all([id_number, first_name, last_name, role_id]):
+        if not all([id_number, first_name, last_name, role_type]):
             flash("Error: Missing required fields.", "danger")
             return redirect(url_for('admin.add_crew'))
 
-        if role_id == '1':
+        if role_type == 'Admin':
              flash("Error: Creating new Admin users is not allowed.", "danger")
              return redirect(url_for('admin.add_crew'))
 
-        # Use the employee_dao from current_app as initialized in run.py
-        # Or better, use the instance attached to the connection/blueprint logic if available.
-        # Looking at login route: employee_dao = current_app.employee_dao
-        
         try:
-            employee_dao = current_app.employee_dao
-            # Check if ID exists (would ideally be in DAO but catching DB error is ok too)
-            existing = employee_dao.get_employee_by_id(id_number)
+            # Check existing
+            existing = auth_service.employee_dao.get_employee_by_id(id_number)
             if existing:
                 flash(f"Error: Employee with ID {id_number} already exists.", "danger")
                 return redirect(url_for('admin.add_crew'))
 
-            employee_dao.add_employee(
+            auth_service.employee_dao.add_employee(
                 id_number, first_name, last_name, phone_number, 
-                city, street, house_no, start_date, role_id, 
+                city, street, house_no, start_date, role_type, 
                 password, long_haul
             )
             flash(f"Employee {first_name} {last_name} added successfully!", "success")
@@ -269,22 +242,91 @@ def add_crew():
 
     return render_template('admin/add_crew.html', active_page='add_crew')
 
-@admin_bp.route('/dashboard/statistics')
-def statistics():
+@admin_bp.route('/dashboard/reports')
+def reports_hub():
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin.login'))
-        
-    # Fetch Data
-    kpi_occupancy = stats_dao.get_avg_fleet_occupancy()
-    rev_by_manufacturer = stats_dao.get_revenue_by_manufacturer()
-    emp_hours = stats_dao.get_employee_flight_hours()
-    cancel_rates = stats_dao.get_monthly_cancellation_rate()
-    aircraft_activity = stats_dao.get_monthly_aircraft_activity()
+    return render_template('admin/reports/hub.html')
+
+@admin_bp.route('/dashboard/reports/occupancy')
+def report_occupancy():
+    if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
     
-    return render_template('admin/statistics.html', 
-                           active_page='statistics',
-                           kpi_occupancy=kpi_occupancy,
-                           rev_by_manufacturer=rev_by_manufacturer,
-                           emp_hours=emp_hours,
-                           cancel_rates=cancel_rates,
-                           aircraft_activity=aircraft_activity)
+    # Kpi Occupancy
+    kpi = flight_service.stats_dao.get_avg_fleet_occupancy()
+    recent_data = flight_service.stats_dao.get_recent_flights_occupancy(limit=5)
+    
+    return render_template('admin/reports/occupancy.html', kpi_occupancy=kpi, recent_data=recent_data)
+
+@admin_bp.route('/dashboard/reports/revenue')
+def report_revenue():
+    if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
+    
+    data = flight_service.stats_dao.get_revenue_by_manufacturer()
+    return render_template('admin/reports/revenue.html', rev_by_manufacturer=data)
+
+@admin_bp.route('/dashboard/reports/hours')
+def report_hours():
+    if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
+    
+    data = flight_service.stats_dao.get_employee_flight_hours()
+    return render_template('admin/reports/hours.html', emp_hours=data)
+
+@admin_bp.route('/dashboard/reports/cancellations')
+def report_cancellations():
+    if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
+    
+    data = flight_service.stats_dao.get_monthly_cancellation_rate()
+    return render_template('admin/reports/cancellations.html', cancel_rates=data)
+
+@admin_bp.route('/dashboard/reports/activity')
+def report_activity():
+    if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
+    
+    data = flight_service.stats_dao.get_aircraft_activity_30_days()
+    return render_template('admin/reports/activity.html', aircraft_activity=data)
+
+@admin_bp.route('/add_aircraft', methods=['GET', 'POST'])
+def add_aircraft():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin.login'))
+
+    if request.method == 'POST':
+        try:
+            manufacturer = request.form.get('manufacturer')
+            size = request.form.get('size')
+            
+            # Use 'or 0' to handle empty strings safely
+            economy_seats = int(request.form.get('economy_seats') or 0)
+            business_seats = int(request.form.get('business_seats') or 0)
+            
+            # Purchase date
+            purchase_date = request.form.get('purchase_date') 
+            if not purchase_date: purchase_date = None
+
+            if not manufacturer or not size:
+                flash("Manufacturer and Size are required.", "danger")
+                return redirect(url_for('admin.add_aircraft'))
+
+            # Call Service
+            res = flight_service.register_new_aircraft(manufacturer, size, economy_seats, business_seats, purchase_date)
+
+            if res['status'] == 'success':
+                flash(f"Aircraft added successfully! (ID: {res['aircraft_id']})", "success")
+                return redirect(url_for('admin.dashboard'))
+            elif res['status'] == 'warning':
+                flash(f"{res['message']} (ID: {res['aircraft_id']})", "warning")
+                return redirect(url_for('admin.dashboard'))
+            else:
+                flash(f"Error: {res['message']}", "danger")
+                return redirect(url_for('admin.add_aircraft'))
+
+        except ValueError:
+            flash("Error: Seat counts must be valid numbers.", "danger")
+            return redirect(url_for('admin.add_aircraft'))
+        except Exception as e:
+            flash(f"Unexpected error: {str(e)}", "danger")
+            return redirect(url_for('admin.add_aircraft'))
+
+    return render_template('admin/add_aircraft.html', active_page='add_aircraft')
+

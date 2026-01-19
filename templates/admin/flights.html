@@ -6,6 +6,24 @@
     <div>
         <h4 class="mb-1">Active Flight Operations</h4>
         <p class="text-muted small mb-0">Overview of all scheduled and ongoing flights.</p>
+
+        <!-- Search Form -->
+        <form method="GET" action="{{ url_for('admin.view_flights') }}" class="d-flex align-items-center gap-2 mt-3">
+            <input type="number" name="flight_id" class="form-control form-control-sm" placeholder="Flight ID"
+                value="{{ current_id or '' }}" style="width: 100px;">
+            <select name="status" class="form-select form-select-sm" style="width: 130px;">
+                <option value="">All Statuses</option>
+                <option value="Scheduled" {% if current_status=='Scheduled' %}selected{% endif %}>Scheduled</option>
+                <option value="On air" {% if current_status=='On air' %}selected{% endif %}>On air</option>
+                <option value="Landed" {% if current_status=='Landed' %}selected{% endif %}>Landed</option>
+                <option value="Cancelled" {% if current_status=='Cancelled' %}selected{% endif %}>Cancelled</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-filter"></i> Filter</button>
+            {% if current_id or current_status %}
+            <a href="{{ url_for('admin.view_flights') }}"
+                class="text-danger small text-decoration-none fw-bold">Clear</a>
+            {% endif %}
+        </form>
     </div>
     <a href="{{ url_for('admin.create_flight_step1') }}" class="btn btn-primary shadow-sm">
         <i class="bi bi-plus-lg"></i> New Flight

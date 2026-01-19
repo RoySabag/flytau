@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Booking Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <div>
+            <h2 class="text-primary mb-0">Booking Reference: {{ order.unique_order_code }}</h2>
+            <span class="badg bg-secondary">Order Date: {{ order.order_date }}</span>
+        </div>
+        <div>
+            <a href="{{ url_for('routes.home') }}" class="btn btn-outline-secondary">Back to Home</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Flight Info -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-plane me-2"></i>Flight Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-center">
+                            <h3 class="fw-bold">{{ order.origin_airport }}</h3>
+                            <small class="text-muted">Origin</small>
+                        </div>
+                        <div class="flex-grow-1 text-center px-4">
+                            <i class="fas fa-plane fa-2x text-primary"></i>
+                            <div class="border-top mt-2 position-relative">
+                                <span
+                                    class="position-absolute top-0 start-50 translate-middle badge bg-white text-muted border">
+                                    {{ order.manufacturer }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <h3 class="fw-bold">{{ order.destination_airport }}</h3>
+                            <small class="text-muted">Destination</small>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <p class="mb-0 lead"><strong>Departure:</strong> {{ order.departure_time }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passengers / Tickets -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Passengers & Seats</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Seat</th>
+                                <th>Class</th>
+                                <th>Passenger</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ticket in order.tickets %}
+                            <tr>
+                                <td class="fw-bold">{{ ticket.row_number }}{{ ticket.column_number }}</td>
+                                <td><span class="badge bg-info text-dark">{{ ticket.class }}</span></td>
+                                <td>
+                                    {% if order.customer_email == session.get('user_email') %}
+                                    {{ session.get('user_name', 'Passenger') }}
+                                    {% else %}
+                                    Guest
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">No seat information available.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary & Actions -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Paid:</span>
+                        <span class="fw-bold">${{ order.total_price }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>Status:</span>
+                        {% if order.order_status == 'active' %}
+                        <span class="badge bg-success">Active</span>
+                        {% elif order.order_status == 'completed' %}
+                        <span class="badge bg-primary">Completed</span>
+                        {% elif order.order_status == 'customer_cancelled' %}
+                        <span class="badge bg-warning text-dark">Customer Cancelled</span>
+                        {% elif order.order_status == 'system_cancelled' %}
+                        <span class="badge bg-danger">System Cancelled</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ order.order_status }}</span>
+                        {% endif %}
+                    </div>
+
+                    <hr>
+
+                    <!-- Actions -->
+                    {% if order.order_status == 'active' %}
+                    <div class="alert alert-info small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>Cancellation Policy:</strong>
+                        You can cancel this booking up to 36 hours before departure.
+                        A 5% service fee will be deducted from your refund.
+                    </div>
+
+                    <form action="{{ url_for('booking.manage_cancel') }}" method="POST"
+                        onsubmit="return confirm('Use 36h cancellation policy? Refund will be 95% of total.');">
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="fas fa-times-circle me-2"></i>Cancel Booking
+                        </button>
+                    </form>
+                    {% else %}
+                    <button class="btn btn-secondary w-100" disabled>Booking Cancelled</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

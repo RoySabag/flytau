@@ -58,8 +58,8 @@
                     <label for="role_id" class="form-label">Role</label>
                     <select class="form-select" id="role_id" name="role_id" required onchange="togglePilotOptions()">
                         <option value="" selected disabled>Select Role...</option>
-                        <option value="2">Pilot</option>
-                        <option value="3">Flight Attendant</option>
+                        <option value="Pilot">Pilot</option>
+                        <option value="Flight Attendant">Flight Attendant</option>
                     </select>
                 </div>
                 <div class="col-md-6" id="pilot_options" style="display: none;">
@@ -85,8 +85,8 @@
     function togglePilotOptions() {
         const role = document.getElementById('role_id').value;
         const pilotOptions = document.getElementById('pilot_options');
-        // Role ID 2 is Pilot, 3 is Flight Attendant
-        if (role === '2' || role === '3') {
+        // Role is now Pilot or Flight Attendant string
+        if (role === 'Pilot' || role === 'Flight Attendant') {
             pilotOptions.style.display = 'block';
         } else {
             pilotOptions.style.display = 'none';

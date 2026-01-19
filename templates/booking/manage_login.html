@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Booking{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h4 class="mb-0"><i class="fas fa-plane-departure me-2"></i>Manage Your Booking</h4>
+                </div>
+                <div class="card-body p-4">
+
+                    <p class="text-muted text-center mb-4">
+                        Please enter your booking reference and email address to view or modify your trip.
+                    </p>
+
+                    <form method="POST" action="{{ url_for('booking.manage_login') }}">
+                        <div class="mb-3">
+                            <label for="order_code" class="form-label fw-bold">Booking Reference (PNR)</label>
+                            <input type="text" class="form-control form-control-lg" id="order_code" name="order_code"
+                                placeholder="e.g. 123456" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label fw-bold">Email Address</label>
+                            <input type="email" class="form-control form-control-lg" id="email" name="email"
+                                placeholder="name@example.com" required>
+                        </div>
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">Find Booking <i
+                                    class="fas fa-arrow-right ms-2"></i></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="text-center mt-3 text-muted">
+                <small>Logged in user? <a href="{{ url_for('routes.profile') }}">Go to My Profile</a></small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -35,7 +35,7 @@
         </div>
     </div>
 
-    <form id="seatForm" method="POST" action="{{ url_for('booking.create_order') }}">
+    <form id="seatForm" method="POST" action="{{ url_for('booking.review_order') }}">
         <!-- Hidden Data: Flight ID, Quantity, Guest Email -->
         <input type="hidden" name="flight_id" value="{{ flight.flight_id }}">
         <input type="hidden" name="quantity" value="{{ quantity }}">

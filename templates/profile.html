@@ -17,13 +17,35 @@
             <div class="row">
                 <div class="col-md-4"><strong>Name:</strong> {{ session.user_name }}</div>
                 <div class="col-md-4"><strong>Email:</strong> {{ session.user_email }}</div>
-                <!-- Add more if needed -->
+                <div class="col-md-4"><strong>Phone Numbers:</strong>
+                    {% if user and user.phone_numbers %}
+                    {{ user.phone_numbers | join(', ') }}
+                    {% else %}
+                    <span class="text-muted">None</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Orders Section -->
-    <h3 class="mb-3"><i class="fas fa-ticket-alt me-2"></i> My Orders</h3>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0"><i class="fas fa-ticket-alt me-2"></i> My Orders</h3>
+
+        <!-- Filter Form -->
+        <form method="GET" action="{{ url_for('routes.profile') }}" class="d-flex align-items-center">
+            <label for="status" class="me-2 fw-bold text-muted">Filter by:</label>
+            <select name="status" class="form-select w-auto" onchange="this.form.submit()">
+                <option value="" {% if not current_filter %}selected{% endif %}>All Orders</option>
+                <option value="active" {% if current_filter=='active' %}selected{% endif %}>Active</option>
+                <option value="completed" {% if current_filter=='completed' %}selected{% endif %}>Completed</option>
+                <option value="customer_cancelled" {% if current_filter=='customer_cancelled' %}selected{% endif %}>
+                    Cancelled by Me</option>
+                <option value="system_cancelled" {% if current_filter=='system_cancelled' %}selected{% endif %}>
+                    Cancelled by System</option>
+            </select>
+        </form>
+    </div>
 
     {% if orders %}
     <div class="table-responsive">
@@ -32,6 +54,7 @@
                 <tr>
                     <th>Order Code</th>
                     <th>Flight Route</th>
+                    <th>Tickets</th>
                     <th>Departure</th>
                     <th>Total Price</th>
                     <th>Status</th>
@@ -47,21 +70,42 @@
                         order.destination_airport }}<br>
                         <small class="text-muted">{{ order.manufacturer }}</small>
                     </td>
+                    <td>
+                        {% if order.tickets %}
+                        <ul class="list-unstyled mb-0 small">
+                            {% for ticket in order.tickets %}
+                            <li>
+                                <i class="fas fa-chair text-muted me-1"></i>
+                                <strong>{{ ticket.row_number }}{{ ticket.column_number }}</strong>
+                                <span class="text-muted">({{ ticket.class }})</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <span class="text-muted small">No seats assigned</span>
+                        {% endif %}
+                    </td>
                     <td>{{ order.departure_time }}</td>
                     <td>${{ order.total_price }}</td>
                     <td>
-                        {% if order.order_status == 'Paid' %}
-                        <span class="badge bg-success">Confirmed</span>
-                        {% elif order.order_status == 'Cancelled' %}
-                        <span class="badge bg-danger">Cancelled</span>
+                        {% if order.order_status == 'active' %}
+                        <span class="badge bg-success">Active</span>
+                        {% elif order.order_status == 'completed' %}
+                        <span class="badge bg-primary">Completed</span>
+                        {% elif order.order_status == 'customer_cancelled' %}
+                        <span class="badge bg-warning text-dark">Customer Cancelled</span>
+                        {% elif order.order_status == 'system_cancelled' %}
+                        <span class="badge bg-danger">System Cancelled</span>
                         {% else %}
                         <span class="badge bg-secondary">{{ order.order_status }}</span>
                         {% endif %}
                     </td>
                     <td>
-                        {% if order.order_status != 'Cancelled' %}
-                        <form action="{{ url_for('routes.cancel_order', order_id=order.order_id) }}" method="POST"
-                            onsubmit="return confirm('Are you sure you want to cancel this order?');">
+                        {% if order.order_status == 'active' %}
+                        <form
+                            action="{{ url_for('routes.cancel_order', order_id=order.unique_order_code or order.order_id) }}"
+                            method="POST"
+                            onsubmit="return confirm('Use 36h cancellation policy? Refund will be 95% of total.');">
                             <button type="submit" class="btn btn-sm btn-outline-danger">
                                 <i class="fas fa-times"></i> Cancel
                             </button>

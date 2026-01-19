@@ -1,20 +1,19 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from app.classes.db_manager import DBManager
-from app.models.daos.flight_dao import FlightDAO
-from app.models.daos.order_dao import OrderDAO
-from app.classes.user import Guest
+from database.db_manager import DBManager
+from app.services.booking_service import BookingService
+from app.services.flight_service import FlightService
 
 booking_bp = Blueprint('booking', __name__)
 
-# אתחול
+# Initialize Services
 db = DBManager()
-flight_dao = FlightDAO(db)
-order_dao = OrderDAO(db)
+booking_service = BookingService(db)
+flight_service = FlightService(db)
 
 @booking_bp.route('/booking/<int:flight_id>', methods=['GET'])
 def pre_book(flight_id):
     """Step 1: Quantity Selection Page"""
-    flight = flight_dao.get_flight_by_id(flight_id)
+    flight = booking_service.get_flight_for_booking(flight_id)
     if not flight:
         flash("Flight not found", "danger")
         return redirect(url_for('routes.home'))
@@ -27,16 +26,14 @@ def init_booking():
     passengers = request.form.get('passengers')
     guest_email = request.form.get('guest_email')
 
-    # אם המשתמש לא מחובר, הוא חייב לספק אימייל (או שזה אורח)
+    # Validation
     if not session.get('user_email') and not guest_email:
         flash("Please provide an email address.", "warning")
         return redirect(url_for('booking.pre_book', flight_id=flight_id))
 
-    # רישום אורח אם צריך
-    if guest_email:
-        Guest.ensure_guest_exists(guest_email)
+    # Service Call
+    booking_service.init_booking_process(flight_id, guest_email)
 
-    # העברה לדף המושבים עם הפרמטרים
     return redirect(url_for('booking.select_seats', flight_id=flight_id, qty=passengers, guest_email=guest_email))
 
 @booking_bp.route('/booking/<int:flight_id>/seats', methods=['GET'])
@@ -45,20 +42,8 @@ def select_seats(flight_id):
     quantity = int(request.args.get('qty', 1))
     guest_email = request.args.get('guest_email')
     
-    flight = flight_dao.get_flight_by_id(flight_id)
-    seats = flight_dao.get_flight_seats(flight_id)
-    
-    # ארגון המושבים
-    seats_by_row = {}
-    if seats:
-        for seat in seats:
-            r = seat['row_number']
-            if r not in seats_by_row:
-                seats_by_row[r] = []
-            seats_by_row[r].append(seat)
-
-    for r in seats_by_row:
-        seats_by_row[r].sort(key=lambda s: s['column_number'])
+    flight = booking_service.get_flight_for_booking(flight_id)
+    seats_by_row = booking_service.get_seat_map(flight_id)
 
     return render_template('flights/seats.html', 
                            flight=flight, 
@@ -66,61 +51,79 @@ def select_seats(flight_id):
                            quantity=quantity, 
                            guest_email=guest_email)
 
-@booking_bp.route('/booking/create', methods=['POST'])
-def create_order():
-    """Step 3: Create Order in DB"""
+@booking_bp.route('/booking/summary', methods=['POST'])
+def review_order():
+    """Step 3: Review Order (Intermediate Step)"""
     flight_id = request.form.get('flight_id')
     guest_email = request.form.get('guest_email')
-    selected_seats = request.form.getlist('selected_seats') # מקבל רשימה
+    selected_seats = request.form.getlist('selected_seats') # List of IDs
     
-    # שליפת פרטי הטיסה לחישוב מחיר
-    flight = flight_dao.get_flight_by_id(flight_id)
-    seats_info = flight_dao.get_flight_seats(flight_id) # לא הכי יעיל אבל בטוח
-    
-    # חישוב מחיר כולל
-    total_price = 0
-    seat_map = {s['seat_id']: s for s in seats_info}
-    
-    for seat_id in selected_seats:
-        seat_id = int(seat_id)
-        if seat_id in seat_map:
-            total_price += seat_map[seat_id]['price']
+    if not selected_seats:
+        flash("No seats selected. Please try again.", "warning")
+        return redirect(url_for('booking.select_seats', flight_id=flight_id))
 
-    # זיהוי הלקוח
-    customer_email = session.get('user_email')
+    # Service Call
+    flight = booking_service.get_flight_for_booking(flight_id)
+    seat_details, total_price = booking_service.process_seat_selection(flight_id, selected_seats)
+            
+    # Store Draft in Session
+    session['draft_order'] = {
+        'flight_id': flight_id,
+        'guest_email': guest_email,
+        'seat_ids': selected_seats,
+        'total_price': float(total_price),
+        'seat_details_view': [(s['row_number'], s['column_number'], s['class'], float(s['price'])) for s in seat_details]
+    }
     
-    # יצירת ההזמנה
-    result = order_dao.create_order(
+    return render_template('flights/summary.html', 
+                           flight=flight, 
+                           seat_details=seat_details, 
+                           total_price=total_price,
+                           guest_email=guest_email)
+
+@booking_bp.route('/booking/confirm', methods=['POST'])
+def confirm_booking():
+    """Step 4: Finalize Order from Draft"""
+    draft = session.get('draft_order')
+    if not draft:
+        flash("Session expired or invalid. Please start over.", "danger")
+        return redirect(url_for('routes.home'))
+        
+    # Get Data from Draft
+    flight_id = draft['flight_id']
+    guest_email = draft['guest_email']
+    total_price = draft['total_price']
+    seat_ids = draft['seat_ids']
+    customer_email = session.get('user_email')
+
+    # Execute Booking via Service
+    result = booking_service.finalize_booking(
         flight_id=flight_id,
         customer_email=customer_email,
         guest_email=guest_email,
         total_price=total_price,
-        seat_ids=selected_seats
+        seat_ids=seat_ids
     )
 
     if result['status'] == 'success':
+        session.pop('draft_order', None)
         return redirect(url_for('booking.confirmation', code=result['order_code']))
     else:
         flash(f"Booking Failed: {result['message']}", "danger")
-        return redirect(url_for('routes.home'))
+        return redirect(url_for('booking.select_seats', flight_id=flight_id))
 
 @booking_bp.route('/booking/confirmation/<code>')
 def confirmation(code):
     """Step 4: Summary Page"""
-    order = order_dao.get_order_details(code.lower()) # ב DB הסדר לא חשוב אבל נבדוק
-    # או שנשתמש ב-UUID כמו שהוא
+    order = booking_service.get_order_confirmation(code.lower())
     if not order:
-        order = order_dao.get_order_details(code.upper())
+        order = booking_service.get_order_confirmation(code.upper())
         
     return render_template('flights/confirmation.html', order=order)
 
 @booking_bp.route('/search', methods=['GET', 'POST'])
 def search_flights():
-    """
-    Route to handle flight search.
-    Accepts query parameters (GET) or form data (POST).
-    """
-    # תמיכה גם ב-GET (אם מגיעים מקישור) וגם ב-POST (מהטופס)
+    """Route to handle flight search."""
     origin = request.args.get('origin') or request.form.get('origin')
     destination = request.args.get('destination') or request.form.get('destination')
     date = request.args.get('date') or request.form.get('date')
@@ -129,12 +132,69 @@ def search_flights():
         flash("Please provide Origin, Destination, and Date.", "warning")
         return redirect(url_for('routes.home'))
 
-    # ביצוע החיפוש דרך ה-DAO
-    results = flight_dao.search_flights(origin, destination, date)
+    # Use FlightService
+    results = flight_service.search_flights(origin, destination, date)
     
-    # רינדור דף התוצאות
     return render_template('flights/search_results.html', 
                            flights=results, 
                            search_params={'origin': origin, 'destination': destination, 'date': date})
 
+# --- Guest Management ---
+
+@booking_bp.route('/manage', methods=['GET', 'POST'])
+def manage_login():
+    """Login page for guest booking management"""
+    if request.method == 'POST':
+        order_code = request.form.get('order_code')
+        email = request.form.get('email')
+        
+        if not order_code or not email:
+            flash("Please provide both Booking Reference and Email.", "warning")
+            return redirect(url_for('booking.manage_login'))
+            
+        # Verify via Service
+        order = booking_service.verify_booking_access(order_code, email)
+        
+        if order:
+            session['manage_order_code'] = order_code
+            return redirect(url_for('booking.manage_dashboard'))
+                
+        flash("We could not find a booking matching those details.", "danger")
+        return redirect(url_for('booking.manage_login'))
+        
+    return render_template('booking/manage_login.html')
+
+@booking_bp.route('/manage/dashboard')
+def manage_dashboard():
+    """Dashboard for managing a specific booking"""
+    order_code = session.get('manage_order_code')
+    if not order_code:
+        return redirect(url_for('booking.manage_login'))
+        
+    order = booking_service.get_order_confirmation(order_code)
+    if not order:
+        session.pop('manage_order_code', None)
+        flash("Booking not found.", "danger")
+        return redirect(url_for('booking.manage_login'))
+        
+    return render_template('booking/manage_dashboard.html', order=order)
+
+@booking_bp.route('/manage/cancel', methods=['POST'])
+def manage_cancel():
+    """Cancel action from guest dashboard"""
+    order_code = session.get('manage_order_code')
+    if not order_code:
+        return redirect(url_for('booking.manage_login'))
+        
+    result = booking_service.cancel_booking(order_code)
+    
+    if result['status'] == 'success':
+        msg = f"Booking Cancelled. Refund: ${result['refund_amount']}"
+        if result['fine'] > 0:
+            msg += f" (Fine: ${result['fine']} applied)"
+        flash(msg, "info")
+    else:
+        flash(result['message'], "danger")
+        
+    return redirect(url_for('booking.manage_dashboard'))
 

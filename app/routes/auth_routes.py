@@ -1,27 +1,26 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from app.classes.user import Customer, Guest  # שים לב: user באות קטנה
+from database.db_manager import DBManager
+# Services
+from app.services.auth_service import AuthService
+from app.services.booking_service import BookingService
+from app.services.flight_service import FlightService
 
-from app.classes.db_manager import DBManager
-from app.models.daos.flight_dao import FlightDAO
-from app.models.daos.order_dao import OrderDAO
+routes = Blueprint('routes', __name__)
 
-# --- הנה השורה שהייתה חסרה או לא נכונה ---
-routes = Blueprint('routes', __name__) 
-# ----------------------------------------
-
-# אתחול DAO
+# Initialize Services
 db = DBManager()
-flight_dao = FlightDAO(db)
-order_dao = OrderDAO(db)
+auth_service = AuthService(db)
+booking_service = BookingService(db)
+flight_service = FlightService(db)
 
-# --- דף הבית ---
+# --- Home Page ---
 @routes.route('/')
 def home():
-    # שליפת כל המיקומים (ערים) כדי לאכלס את ה-Select Box
-    locations = flight_dao.get_all_locations()
-    return render_template('index.html', locations=locations)
+    locations = flight_service.get_all_locations()
+    flights = flight_service.get_active_flights()
+    return render_template('index.html', locations=locations, flights=flights)
 
-# --- פרופיל משתמש ---
+# --- Profile ---
 @routes.route('/profile')
 def profile():
     if 'user_email' not in session:
@@ -29,15 +28,20 @@ def profile():
         return redirect(url_for('routes.login'))
     
     email = session['user_email']
-    orders = order_dao.get_customer_orders(email)
-    return render_template('profile.html', orders=orders)
+    status_filter = request.args.get('status')
+    
+    # Use Services
+    user = auth_service.user_dao.get_customer_by_email(email) # Accessing DAO via service for now or add getter in Service
+    orders = booking_service.get_customer_history(email, status_filter)
+    
+    return render_template('profile.html', orders=orders, user=user, current_filter=status_filter)
 
 @routes.route('/order/cancel/<int:order_id>', methods=['POST'])
 def cancel_order(order_id):
     if 'user_email' not in session:
         return redirect(url_for('routes.login'))
         
-    result = order_dao.cancel_order(order_id)
+    result = booking_service.cancel_booking(order_id)
     
     if result['status'] == 'success':
         msg = f"Order Cancelled. Refund: ${result['refund_amount']}"
@@ -49,18 +53,23 @@ def cancel_order(order_id):
         
     return redirect(url_for('routes.profile'))
 
-# --- דף הרשמה (Register) ---
+# --- Register ---
 @routes.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        first_name = request.form['first_name']
-        last_name = request.form['last_name']
-        passport = request.form['passport']
-        dob = request.form['dob']
+        # Prepare Data
+        form_data = {
+            'email': request.form['email'],
+            'password': request.form['password'],
+            'first_name': request.form['first_name'],
+            'last_name': request.form['last_name'],
+            'passport': request.form['passport'],
+            'dob': request.form['dob'],
+            'phone_number': request.form['phone_number'],
+            'additional_phone_number': request.form.get('additional_phone_number')
+        }
 
-        if Customer.insert_customer(email, password, first_name, last_name, passport, dob):
+        if auth_service.register_customer(form_data):
             flash('Registration Successful! Please Login.', 'success')
             return redirect(url_for('routes.login'))
         else:
@@ -68,16 +77,16 @@ def register():
     
     return render_template('register.html')
 
-# --- דף התחברות (Login) ---
+# --- Login ---
 @routes.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
         
-        user = Customer.get_customer_by_email(email)
+        user = auth_service.login_customer(email, password)
         
-        if user and user.password == password:
+        if user:
             session['user_email'] = user.email
             session['user_name'] = user.first_name
             flash(f'Welcome back, {user.first_name}!', 'success')
@@ -87,7 +96,7 @@ def login():
 
     return render_template('login.html')
 
-# --- התנתקות (Logout) ---
+# --- Logout ---
 @routes.route('/logout')
 def logout():
     session.clear()

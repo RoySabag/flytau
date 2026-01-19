@@ -1,0 +1,101 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-9">
+
+        <!-- Header Card -->
+        <div class="card mb-4 border-0 shadow-sm text-center"
+            style="background-color: #0d1e34; border-radius: 12px 12px 0 0; color: white;">
+            <div class="card-body py-5">
+                <div class="mb-3">
+                    <span class="d-inline-block rounded-circle p-3" style="background-color: rgba(255,255,255,0.1);">
+                        <i class="bi bi-airplane-fill fs-3" style="color: #06b6d4;"></i>
+                    </span>
+                </div>
+                <h3 class="fw-bold text-white mb-1">Add New Aircraft</h3>
+                <small class="text-uppercase" style="letter-spacing: 1px; font-size: 0.75rem; color: #94a3b8;">Fleet
+                    Expansion Registry</small>
+            </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="card border-0 shadow-sm p-4" style="border-radius: 0 0 12px 12px; margin-top: -10px; z-index: 2;">
+            <form method="POST" action="{{ url_for('admin.add_aircraft') }}">
+
+                <!-- Manufacturer & Size -->
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label text-muted small fw-bold">Manufacturer</label>
+                        <div class="input-group">
+                            <select class="form-select border-mute py-2" name="manufacturer" required>
+                                <option value="" selected disabled>Select Manufacturer</option>
+                                <option value="Boeing">Boeing</option>
+                                <option value="Airbus">Airbus</option>
+                                <option value="Embraer">Embraer</option>
+                                <option value="Dassault">Dassault</option>
+                            </select>
+                            <span class="input-group-text bg-transparent border-start-0 text-muted"><i
+                                    class="bi bi-building"></i></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small fw-bold">Configuration Type (Size)</label>
+                        <div class="input-group">
+                            <select class="form-select border-mute py-2" name="size" required>
+                                <option value="" selected disabled>Select Size</option>
+                                <option value="Small">Small (Narrow-body / Regional)</option>
+                                <option value="Big">Big (Wide-body)</option>
+                            </select>
+                            <span class="input-group-text bg-transparent border-start-0 text-muted"><i
+                                    class="bi bi-arrows-angle-expand"></i></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Seats -->
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <div class="p-3 border rounded bg-primary-soft" style="background-color: #f0f9ff;">
+                            <label class="form-label text-primary small fw-bold"><i class="bi bi-person-fill"></i>
+                                Economy Class</label>
+                            <input type="number" class="form-control" name="economy_seats" placeholder="Number of seats"
+                                min="0" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded bg-indigo-soft" style="background-color: #f5f3ff;">
+                            <label class="form-label text-indigo small fw-bold" style="color: #7c3aed;"><i
+                                    class="bi bi-star-fill"></i> Business Class</label>
+                            <input type="number" class="form-control" name="business_seats"
+                                placeholder="Number of seats" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Purchase Date -->
+                <div class="row mb-5">
+                    <div class="col-md-12">
+                        <label class="form-label text-muted small fw-bold">Purchase Date</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control py-2" name="purchase_date">
+                            <span class="input-group-text bg-transparent border-start-0 text-muted"><i
+                                    class="bi bi-calendar"></i></span>
+                        </div>
+                        <div class="form-text small text-muted">Used for fleet age analysis (Optional)</div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary py-3 fw-bold"
+                        style="background-color: #0891b2; border: none; border-radius: 8px;">
+                        <i class="bi bi-plus-lg me-2"></i> Register Aircraft
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

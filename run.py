@@ -1,5 +1,5 @@
 from flask import Flask
-from app.classes.db_manager import DBManager
+from database.db_manager import DBManager
 # From main branch
 from app.routes.auth_routes import routes
 # From fix-login-system branch
