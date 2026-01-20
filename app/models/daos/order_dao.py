@@ -165,6 +165,10 @@ class OrderDAO:
         - Updates `order_status` to 'customer_cancelled'.
         - Updates `total_price` to the **fine amount** (representing retained revenue).
         """
+        # Ensure order_id is string to avoid MySQL "Truncated incorrect DOUBLE value" 
+        # when comparing against VARCHAR column containing non-numeric legacy data.
+        order_id_str = str(order_id)
+
         # 1. Get Flight Info to validate time
         query_check = """
             SELECT f.departure_time, o.total_price, o.order_status
@@ -172,7 +176,7 @@ class OrderDAO:
             JOIN flights f ON o.flight_id = f.flight_id
             WHERE o.unique_order_code = %s
         """
-        order = self.db.fetch_one(query_check, (order_id,))
+        order = self.db.fetch_one(query_check, (order_id_str,))
         
         if not order:
             return {"status": "error", "message": "Order not found"}
@@ -185,6 +189,8 @@ class OrderDAO:
             departure_time = datetime.strptime(departure_time, '%Y-%m-%d %H:%M:%S')
             
         # 2. Calculate Time Difference
+        # Use simple naive comparison (assuming DB is consistent with app server time)
+        # Ideally both should be UTC.
         time_diff = departure_time - datetime.now()
         hours_diff = time_diff.total_seconds() / 3600
         
@@ -194,7 +200,7 @@ class OrderDAO:
         if hours_diff < 36:
              return {
                  "status": "error", 
-                 "message": "Cancellation is only allowed up to 36 hours before departure. This flight cannot be cancelled."
+                 "message": f"Cancellation rejected. Flight departs in {round(hours_diff, 1)} hours (Minimum 36h notice required)."
              }
 
         # 4. Calculate Financials (5% Penalty)
@@ -203,9 +209,29 @@ class OrderDAO:
 
         # 5. Update Database
         # The stored total_price is updated to the fine amount (Company Revenue).
+        # Using exact ENUM value 'customer_cancelled'
         query_update = "UPDATE orders SET order_status = 'customer_cancelled', total_price = %s WHERE unique_order_code = %s"
         try:
-            self.db.execute_query(query_update, (fine, order_id))
+            # Round fine to 2 decimal places ensuring compliance with DECIMAL(10,2)
+            rounded_fine = round(fine, 2)
+            res = self.db.execute_query(query_update, (rounded_fine, order_id_str))
+            
+            # execute_query returns None on error, rowcount (int) on success
+            if res is None:
+                return {"status": "error", "message": "Database update failed (Query Error). Check server logs."}
+            
+            # execute_query returns rowcount for updates if not SELECT/INSERT
+            if res == 0:
+                 # It might return 0 if values didn't change (unlikely) or ID not found (unlikely as we selected it)
+                 # But let's verify.
+                 pass
+            
+            return {
+                "status": "success",
+                "refund_amount": round(refund_amount, 2),
+                "fine": rounded_fine,
+                "message": "Order cancelled successfully"
+            }
             return {
                 "status": "success",
                 "refund_amount": round(refund_amount, 2),

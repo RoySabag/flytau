@@ -16,6 +16,10 @@ flight_service = FlightService(db)
 # --- Home Page ---
 @routes.route('/')
 def home():
+    # Restrict Admins from Search Page
+    if session.get('admin_logged_in'):
+        return redirect(url_for('admin.dashboard'))
+
     locations = flight_service.get_all_locations()
     flights = flight_service.get_active_flights()
     return render_template('index.html', locations=locations, flights=flights)

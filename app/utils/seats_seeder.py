@@ -41,12 +41,25 @@ def create_seats_for_aircraft(aircraft_data):
     policy_name = "Business + Economy" if is_big else "Economy Only"
     print(f"🔹 Processing Aircraft {aircraft_id}: DB Size='{size_value}' ({type(size_value).__name__}) -> Policy='{policy_name}'")
 
-    # 2. Get Layout Configuration
-    if aircraft_id not in AIRCRAFT_CONFIG:
-        print(f"⚠️ No layout config found for aircraft ID {aircraft_id}. Skipping.")
+    # Check if seats already exist to avoid duplicates
+    existing_seats = DB.fetch_one("SELECT 1 FROM seats WHERE aircraft_id = %s LIMIT 1", (aircraft_id,))
+    if existing_seats:
+        print(f"ℹ️ Seats already exist for Aircraft {aircraft_id}. Skipping.")
         return
 
-    config = AIRCRAFT_CONFIG[aircraft_id]
+    # 2. Get Layout Configuration
+    if aircraft_id in AIRCRAFT_CONFIG:
+        config = AIRCRAFT_CONFIG[aircraft_id]
+        print(f"   Using custom config for ID {aircraft_id}.")
+    else:
+        # Dynamic Fallback based on Size
+        if is_big:
+            config = {'rows': 45, 'cols': 'ABCDEFGH', 'business_rows': 5}
+            print(f"   ⚠️ No custom config for ID {aircraft_id}. Using DEFAULT BIG config.")
+        else:
+            config = {'rows': 30, 'cols': 'ABCDEF', 'business_rows': 0} 
+            print(f"   ⚠️ No custom config for ID {aircraft_id}. Using DEFAULT SMALL config.")
+
     total_rows = config['rows']
     columns = list(config['cols'])
     business_rows_limit = config.get('business_rows', 0)

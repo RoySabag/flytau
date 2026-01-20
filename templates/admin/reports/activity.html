@@ -44,7 +44,10 @@
         <div class="fw-bold text-dark mt-1">High Fidelity</div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
+{{ super() }}
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -55,6 +58,12 @@
     const flights = rawData.map(x => x.flights_count);
     const utilization = rawData.map(x => x.utilization);
     const routes = rawData.map(x => x.dominant_route);
+
+    // Check if Chart is defined (it should be if super() loaded correctly)
+    if (typeof Chart === 'undefined') {
+        console.error("Chart.js not loaded!");
+        return;
+    }
 
     Chart.register(ChartDataLabels);
 
@@ -142,6 +151,6 @@
             }
         }
     });
-        });
+    });
 </script>
 {% endblock %}

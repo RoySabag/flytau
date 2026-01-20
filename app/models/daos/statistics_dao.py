@@ -101,20 +101,20 @@ class StatisticsDAO:
         Chart: Employee Flight Hours Distribution.
         Compares 'Short Haul' vs 'Long Haul' work hours for Pilots and Attendants.
         """
-        # Updated to use correct schema: crew_assignments -> crew_members (role_type)
-        # Note: Duration is in 'routes' table.
+        # Updated to join 'staff' table because 'crew_members' does not contain names.
         query = """
             SELECT 
-                CONCAT(cm.first_name, ' ', cm.last_name, ' (', cm.role_type, ')') as label,
-                ROUND(SUM(CASE WHEN rt.route_type = 'Short' THEN TIME_TO_SEC(rt.flight_duration)/3600 ELSE 0 END), 2) AS short_flight_hours,
-                ROUND(SUM(CASE WHEN rt.route_type = 'Long' THEN TIME_TO_SEC(rt.flight_duration)/3600 ELSE 0 END), 2) AS long_flight_hours,
-                ROUND(SUM(TIME_TO_SEC(rt.flight_duration)/3600), 2) as total_hours
+                CONCAT(s.first_name, ' ', s.last_name, ' (', cm.role_type, ')') as label,
+                ROUND(SUM(CASE WHEN TIME_TO_SEC(rt.flight_duration)/3600 <= 6 THEN TIME_TO_SEC(rt.flight_duration)/3600 ELSE 0 END), 1) AS short_flight_hours,
+                ROUND(SUM(CASE WHEN TIME_TO_SEC(rt.flight_duration)/3600 > 6 THEN TIME_TO_SEC(rt.flight_duration)/3600 ELSE 0 END), 1) AS long_flight_hours,
+                ROUND(SUM(TIME_TO_SEC(rt.flight_duration)/3600), 1) as total_hours
             FROM crew_assignments ca
             JOIN crew_members cm ON ca.employee_id = cm.employee_id
+            JOIN staff s ON cm.employee_id = s.employee_id
             JOIN flights f ON ca.flight_id = f.flight_id
             JOIN routes rt ON f.route_id = rt.route_id
             WHERE f.flight_status = 'Landed'
-            GROUP BY cm.employee_id, cm.first_name, cm.last_name, cm.role_type
+            GROUP BY cm.employee_id, s.first_name, s.last_name, cm.role_type
             ORDER BY total_hours DESC
             LIMIT 20
         """
@@ -128,7 +128,7 @@ class StatisticsDAO:
         query = """
             SELECT 
                 DATE_FORMAT(order_date, '%Y-%m') AS month,
-                ROUND((SUM(CASE WHEN order_status = 'customer_cancelled' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 1) AS cancellation_rate
+                ROUND((SUM(CASE WHEN LOWER(order_status) = 'customer_cancelled' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 1) AS cancellation_rate
             FROM orders 
             GROUP BY month 
             ORDER BY month DESC
@@ -145,12 +145,13 @@ class StatisticsDAO:
         - Bars: Number of Flights (Landed)
         - Line: Utilization %
         """
-        # Note: Using a simplified calculation for utilization (Hours Flown / 720 hours)
+        # Note: Restored 30-day filter as per strict user requirement.
+        # Added COALESCE for NULL handling and moved status/date check to JOIN for correctness.
         query = """
             SELECT 
-                CONCAT('Plane ', a.aircraft_id, ' (', a.manufacturer, ')') as label,
-                COUNT(CASE WHEN f.flight_status = 'Landed' THEN 1 END) as flights_count,
-                ROUND((SUM(CASE WHEN f.flight_status = 'Landed' THEN TIME_TO_SEC(rt.flight_duration)/3600 ELSE 0 END) / 720) * 100, 1) as utilization,
+                CONCAT('Plane ', a.aircraft_id, ' (', COALESCE(a.manufacturer, 'Unknown'), ')') as label,
+                COUNT(f.flight_id) as flights_count,
+                ROUND(COALESCE(SUM(TIME_TO_SEC(rt.flight_duration)/3600), 0) / 720 * 100, 1) as utilization,
                 (
                     SELECT CONCAT(r2.origin_airport, '-', r2.destination_airport) 
                     FROM flights f2 
@@ -163,6 +164,7 @@ class StatisticsDAO:
                 ) as dominant_route
             FROM aircraft a
             LEFT JOIN flights f ON a.aircraft_id = f.aircraft_id 
+                AND f.flight_status = 'Landed'
                 AND f.departure_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
             LEFT JOIN routes rt ON f.route_id = rt.route_id
             GROUP BY a.aircraft_id, a.manufacturer
