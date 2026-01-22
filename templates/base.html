@@ -81,21 +81,7 @@
     {% block hero %}{% endblock %}
 
     <main class="container flex-grow-1">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="row justify-content-center mb-4 fade-in">
-            <div class="col-md-10">
-                {% for category, message in messages %}
-                <div
-                    class="alert alert-{{ category if category != 'message' else 'info' }} border-0 shadow-sm d-flex align-items-center">
-                    <i class="bi bi-info-circle-fill me-2 fs-5"></i>
-                    <div>{{ message }}</div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-        {% endwith %}
+
 
         {% block content %}{% endblock %}
     </main>

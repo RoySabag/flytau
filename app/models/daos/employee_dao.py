@@ -38,17 +38,22 @@ class EmployeeDAO:
         if crew:
              staff = self.db.fetch_one("SELECT * FROM staff WHERE employee_id = %s", (employee_id,))
              if staff:
-                staff.update(crew) # role_type is already in crew_members table
+                # Role is now in staff table ('role' column), but we might map it to 'role_type' for internal consistency if needed.
+                # The staff dict will contain 'role'.
+                staff['role_type'] = staff.get('role') 
+                staff.update(crew) 
                 return staff
              return None
 
         return None
 
     def is_admin(self, employee_id):
-        """Checks existence in the admins table."""
-        query = "SELECT 1 FROM admins WHERE employee_id = %s"
+        """Checks role in the staff table."""
+        query = "SELECT role FROM staff WHERE employee_id = %s"
         result = self.db.fetch_one(query, (employee_id,))
-        return True if result else False
+        if result and result['role'] == 'Admin':
+            return True
+        return False
 
     def verify_admin_access(self, employee_id):
         """
@@ -72,10 +77,10 @@ class EmployeeDAO:
             # 1. Insert into Staff
             query_staff = """
                 INSERT INTO staff 
-                (employee_id, first_name, last_name, phone_number, city, street, house_no, employment_start_date)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (employee_id, first_name, last_name, phone_number, city, street, house_no, employment_start_date, role)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
-            params_staff = (id_number, first_name, last_name, phone_number, city, street, house_no, start_date)
+            params_staff = (id_number, first_name, last_name, phone_number, city, street, house_no, start_date, role_type)
             self.db.execute_query(query_staff, params_staff)
 
             # 2. Insert into Role Table
@@ -87,8 +92,9 @@ class EmployeeDAO:
                  self.db.execute_query(query_admin, (id_number, password))
             
             elif role_type in ['Pilot', 'Flight Attendant']:
-                 query_crew = "INSERT INTO crew_members (employee_id, role_type, long_haul_certified) VALUES (%s, %s, %s)"
-                 self.db.execute_query(query_crew, (id_number, role_type, long_haul))
+                 # role_type is now in staff table. crew_members may track extra data but not role.
+                 query_crew = "INSERT INTO crew_members (employee_id, long_haul_certified) VALUES (%s, %s)"
+                 self.db.execute_query(query_crew, (id_number, long_haul))
             
             else:
                 print(f"Unknown role type: {role_type}")

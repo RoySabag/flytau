@@ -30,15 +30,15 @@ class DBManager:
                     pool_reset_session=True,
                     **db_config
                 )
-                print("✅ Connection Pool Created Successfully")
+                print("Connection Pool Created Successfully")
             except Exception as e:
-                print(f"❌ Failed to create connection pool: {e}")
+                print(f"Error Failed to create connection pool: {e}")
 
     def get_connection(self):
         try:
             return self._connection_pool.get_connection()
         except Exception as e:
-            print(f"❌ Error getting connection: {e}")
+            print(f"Error getting connection: {e}")
             return None
 
     def execute_query(self, query, params=None):
@@ -65,7 +65,7 @@ class DBManager:
                      result = cursor.rowcount
 
         except Exception as e:
-            print(f"❌ Query Error: {e}")
+            print(f"Error Query Error: {e}")
             if connection:
                 connection.rollback()
         

@@ -41,7 +41,8 @@ class AuthService:
         # Based on route logic:
         employee = self.employee_dao.get_employee_by_id(employee_id)
         if employee and self.employee_dao.is_admin(employee_id):
-            # Password check placeholder (if schema supports it)
-            # if employee.get('login_password') == password: return employee
-            return employee
+            # Verify password against database record
+            # Note: In a production app, verify_hash(password, employee['login_password'])
+            if employee.get('login_password') == password:
+                return employee
         return None

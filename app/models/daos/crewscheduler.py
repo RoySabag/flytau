@@ -116,7 +116,7 @@ class CrewScheduler:
         
         WHERE 
           -- 1. Role Filter
-          cm.role_type = %s 
+          s.role = %s 
           
           -- 2. Location Filter (Local or valid transfer available)
           AND (

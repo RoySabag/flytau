@@ -7,62 +7,55 @@ class SeatService:
 
     def generate_seats(self, aircraft_id, business_seats, economy_seats):
         """
-        Dynamically generates seat records for an aircraft based on capacity.
+        Generates configuration records for `aircraft_classes`.
         """
-        seats_data = []
-        
         # Configuration Assumptions
-        # Business: 4 seats per row (AC DF) - Spacious
-        # Economy: 6 seats per row (ABC DEF) - Standard
+        # Business: 4 seats per row (AC DF) -> 'ACDF'
+        # Economy: 6 seats per row (ABC DEF) -> 'ABCDEF'
         
         biz_seats_per_row = 4
         eco_seats_per_row = 6
         
-        biz_cols = ['A', 'C', 'D', 'F']
-        eco_cols = ['A', 'B', 'C', 'D', 'E', 'F']
+        biz_cols_str = 'ACDF'
+        eco_cols_str = 'ABCDEF'
         
         current_row = 1
         
-        # 1. Generate Business Class Rows
-        if business_seats > 0:
-            num_biz_rows = math.ceil(business_seats / biz_seats_per_row)
-            for _ in range(num_biz_rows):
-                # Ensure we don't exceed exact count if strictly required, 
-                # but usually aircraft correspond to full rows. 
-                # We'll generate full rows for simplicity as partial rows are rare in config.
-                for col in biz_cols:
-                    seats_data.append((aircraft_id, current_row, col, 'Business'))
-                current_row += 1
-                
-        # 2. Generate Economy Class Rows
-        if economy_seats > 0:
-            # Start economy a few rows after business? Or immediately?
-            # Standard: Immediately next row.
-            num_eco_rows = math.ceil(economy_seats / eco_seats_per_row)
-            for _ in range(num_eco_rows):
-                for col in eco_cols:
-                    seats_data.append((aircraft_id, current_row, col, 'Economy'))
-                current_row += 1
-                
-        # 3. Batch Insert
         try:
-            conn = self.db.get_connection() # Use raw connection for speed
+            conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            sql = "INSERT INTO seats (aircraft_id, `row_number`, column_number, class) VALUES (%s, %s, %s, %s)"
-            cursor.executemany(sql, seats_data)
+            # 1. Business Class
+            if business_seats > 0:
+                num_biz_rows = math.ceil(business_seats / biz_seats_per_row)
+                row_end = current_row + num_biz_rows - 1
+                
+                sql_biz = """
+                    INSERT INTO aircraft_classes (aircraft_id, class_name, row_start, row_end, columns)
+                    VALUES (%s, 'Business', %s, %s, %s)
+                """
+                cursor.execute(sql_biz, (aircraft_id, current_row, row_end, biz_cols_str))
+                current_row = row_end + 1
+                
+            # 2. Economy Class
+            if economy_seats > 0:
+                num_eco_rows = math.ceil(economy_seats / eco_seats_per_row)
+                row_end = current_row + num_eco_rows - 1
+                
+                sql_eco = """
+                    INSERT INTO aircraft_classes (aircraft_id, class_name, row_start, row_end, columns)
+                    VALUES (%s, 'Economy', %s, %s, %s)
+                """
+                cursor.execute(sql_eco, (aircraft_id, current_row, row_end, eco_cols_str))
+                
             conn.commit()
-            print(f"Generated {len(seats_data)} seats for Aircraft {aircraft_id}")
+            print(f"configured Aircraft {aircraft_id} successfully")
             return True
             
         except Exception as e:
-            print(f"Error generating seats: {e}")
+            print(f"Error configuring aircraft: {e}")
             if conn: conn.rollback()
             return False
         finally:
             if cursor: cursor.close()
-            # Don't close conn if pooled? DBManager.get_connection might return pooled.
-            # Assuming DBManager implementation handles pool, we just close cursor. 
-            # If get_connection() returns a raw connection that shouldn't be closed manually if using a pool framework unless we know it's safe.
-            # Safe logic: if DBManager.get_connection returns the pool's connection object, we shouldn't close it, just commit.
-            pass 
+            if conn: conn.close() 

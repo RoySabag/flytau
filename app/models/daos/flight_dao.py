@@ -138,7 +138,7 @@ class FlightDAO:
             query += " WHERE f.flight_id = %s"
             params.append(flight_id)
             
-        query += " ORDER BY f.departure_time ASC"
+        query += " ORDER BY f.departure_time DESC"
         
         flights = self.db.fetch_all(query, tuple(params))
         if not flights:
@@ -344,53 +344,66 @@ class FlightDAO:
 
     def get_flight_seats(self, flight_id):
         """
-        Generates a "Seat Map" for the UI.
-        Combinations static aircraft seat configuration with dynamic booking data.
-        
-        Returns a list of seats with:
-        - Position (Row/Col)
-        - Class (Economy/Business)
-        - Price (Resolved from flight settings)
-        - `is_occupied` flag.
+        Generates a "Seat Map" for the UI dynamically from Aircraft Configuration.
         """
         # 1. Fetch Flight Context
         flight = self.get_flight_by_id(flight_id)
-        if not flight:
-            return None
+        if not flight: return None
             
         aircraft_id = flight['aircraft_id']
         economy_price = flight['economy_price']
         business_price = flight['business_price']
 
-        if not aircraft_id:
-            # Setup incomplete
+        if not aircraft_id: return []
+
+        # 2. Fetch Configuration
+        query_config = "SELECT * FROM aircraft_classes WHERE aircraft_id = %s ORDER BY row_start"
+        configs = self.db.fetch_all(query_config, (aircraft_id,))
+        
+        if not configs:
             return []
 
-        # 2. Fetch All Seats in Aircraft Configuration
-        query_seats = "SELECT * FROM seats WHERE aircraft_id = %s ORDER BY `row_number`, column_number"
-        all_seats = self.db.fetch_all(query_seats, (aircraft_id,))
-
-        # 3. Identify Occupied Seats
-        # Excludes cancelled orders from occupancy check.
+        # 3. Fetch Occupied Seats (Row/Col)
         query_occupied = """
-            SELECT ol.seat_id 
+            SELECT ol.row_number, ol.column_number
             FROM order_lines ol
             JOIN orders o ON ol.unique_order_code = o.unique_order_code
             WHERE ol.flight_id = %s AND o.order_status != 'Cancelled'
         """
         occupied_results = self.db.fetch_all(query_occupied, (flight_id,))
-        occupied_ids = {row['seat_id'] for row in occupied_results}
+        # Create a set of "Row-Col" strings for fast lookup
+        occupied_set = {f"{row['row_number']}-{row['column_number']}" for row in occupied_results}
 
-        # 4. Merge and Format
+        # 4. Generate Seat Map
         final_seats = []
-        for seat in all_seats:
-            seat_id = seat['seat_id']
-            is_occupied = seat_id in occupied_ids
+        
+        # We need to assign a fake 'seat_id' for the frontend to work if it relies on it, 
+        # OR update frontend. For now, we'll generate a composite ID like "ROW-COL" 
+        # but if the frontend expects INT, we might need to hash or just change frontend.
+        # Looking at previous code, seat_id was INT.
+        # Let's check if we can assume frontend handles string IDs? 
+        # The frontend likely uses it values in checkboxes.
+        # We will use "row_col" string as seat_id.
+        
+        for cfg in configs:
+            cls_name = cfg['class_name']
+            columns = list(cfg['columns'])
+            price = business_price if cls_name == 'Business' else economy_price
             
-            seat['is_occupied'] = is_occupied
-            seat['price'] = business_price if seat['class'] == 'Business' else economy_price
-            
-            final_seats.append(seat)
+            for r in range(cfg['row_start'], cfg['row_end'] + 1):
+                for c in columns:
+                    unique_id = f"{r}-{c}"
+                    is_occupied = unique_id in occupied_set
+                    
+                    seat_obj = {
+                        'seat_id': unique_id, # Virtual ID
+                        'row_number': r,
+                        'column_number': c,
+                        'class': cls_name,
+                        'price': price,
+                        'is_occupied': is_occupied
+                    }
+                    final_seats.append(seat_obj)
 
         return final_seats
 
@@ -423,7 +436,7 @@ class FlightDAO:
                   AND r.destination_airport = %s
                   AND DATE(f.departure_time) = %s
                   AND f.flight_status = 'Scheduled'
-                ORDER BY f.departure_time ASC
+                ORDER BY f.departure_time DESC
             """
             
             return self.db.fetch_all(query, (origin, destination, date))

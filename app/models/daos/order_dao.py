@@ -16,6 +16,20 @@ class OrderDAO:
     def __init__(self, db_manager):
         self.db = db_manager
 
+    def _get_seat_class_map(self, flight_id):
+        """
+        Helper: Resolves row ranges to classes for a flight.
+        Returns list of tuples: (row_start, row_end, class_name)
+        """
+        query = """
+            SELECT ac.row_start, ac.row_end, ac.class_name
+            FROM flights f
+            JOIN aircraft_classes ac ON f.aircraft_id = ac.aircraft_id
+            WHERE f.flight_id = %s
+            ORDER BY ac.row_start
+        """
+        return [(r['row_start'], r['row_end'], r['class_name']) for r in self.db.fetch_all(query, (flight_id,))]
+
     # =================================================================
     # Part A: Order Creation
     # =================================================================
@@ -50,10 +64,38 @@ class OrderDAO:
             
             cursor.execute(query_order, (order_code, flight_id, total_price, c_email, g_email))
             
-            # 3. Insert Order Lines (Tickets)
-            query_line = "INSERT INTO order_lines (unique_order_code, seat_id, flight_id) VALUES (%s, %s, %s)"
+            # 3. Insert Order Lines (Tickets) with Resolved Class
+            # First, fetch class mapping for this flight's aircraft
+            # We assume flight_id is valid.
+            class_map = self._get_seat_class_map(flight_id)
             
-            lines_data = [(order_code, seat_id, flight_id) for seat_id in seat_ids]
+            query_line = """
+                INSERT INTO order_lines 
+                (unique_order_code, flight_id, `row_number`, `column_number`, `class`) 
+                VALUES (%s, %s, %s, %s, %s)
+            """
+            
+            lines_data = []
+            for seat_str in seat_ids:
+                # seat_str is "row-col" (e.g. "1-A")
+                try:
+                    r_str, c_str = seat_str.split('-')
+                    row = int(r_str)
+                    col = c_str
+                    
+                    # Resolve class
+                    # heuristic: find which range the row falls into
+                    seat_class = 'Economy' # fallback
+                    for (r_start, r_end, c_name) in class_map:
+                        if r_start <= row <= r_end:
+                            seat_class = c_name
+                            break
+                    
+                    lines_data.append((order_code, flight_id, row, col, seat_class))
+                except ValueError:
+                    print(f"Invalid seat format: {seat_str}")
+                    continue
+
             cursor.executemany(query_line, lines_data)
             
             conn.commit()
@@ -92,12 +134,12 @@ class OrderDAO:
         
         if order:
             # 2. Fetch specific tickets/seats associated with this order
+            # Refactored: Fetch directly from order_lines (No seats table)
             q_tickets = """
-                SELECT s.row_number, s.column_number, s.class
-                FROM order_lines ol
-                JOIN seats s ON ol.seat_id = s.seat_id
-                WHERE ol.unique_order_code = %s
-                ORDER BY s.row_number, s.column_number
+                SELECT `row_number`, `column_number`, `class`
+                FROM order_lines
+                WHERE unique_order_code = %s
+                ORDER BY `row_number`, `column_number`
             """
             order['tickets'] = self.db.fetch_all(q_tickets, (order_code,))
             
@@ -137,11 +179,10 @@ class OrderDAO:
         # Note: N+1 queries used here for simplicity as user order history is typically small.
         for order in orders:
             q_tickets = """
-                SELECT s.row_number, s.column_number, s.class
-                FROM order_lines ol
-                JOIN seats s ON ol.seat_id = s.seat_id
-                WHERE ol.unique_order_code = %s
-                ORDER BY s.row_number, s.column_number
+                SELECT row_number, column_number, class
+                FROM order_lines
+                WHERE unique_order_code = %s
+                ORDER BY row_number, column_number
             """
             tickets = self.db.fetch_all(q_tickets, (order['unique_order_code'],))
             order['tickets'] = tickets

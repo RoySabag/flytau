@@ -11,91 +11,85 @@
     </div>
 
     <!-- Header Section -->
-    <div class="card bg-dark text-white shadow-lg mb-5 border-0"
-        style="border-radius: 15px; background-color: #0f172a !important;">
-        <div class="card-body p-5 text-center">
-            <div class="mb-3">
-                <span class="badge bg-primary p-3 rounded-circle"
-                    style="width: 60px; height: 60px; display: inline-flex; align-items: center; justify-content: center;">
-                    <i class="bi bi-bar-chart-fill fs-3"></i>
-                </span>
-            </div>
-            <h1 class="display-5 fw-bold mb-2">Management Reports</h1>
-            <p class="text-white-50 lead mb-0">Select a report to view detailed analytics and performance charts.</p>
-        </div>
+    <!-- Header Section -->
+    <!-- Header Section -->
+    <div class="text-center mb-5 fade-in">
+        <h1 class="display-4 fw-light text-dark mb-2 tracking-wide">Management Reports</h1>
     </div>
+
+    <style>
+        .tracking-wide {
+            letter-spacing: 0.05em;
+        }
+    </style>
+
+
 
     <!-- Reports List -->
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="list-group shadow-sm" style="border-radius: 12px; overflow: hidden;">
+    <!-- Reports Grid -->
+    <div class="row g-4 justify-content-center">
 
-                <!-- Report 1 -->
-                <a href="{{ url_for('admin.report_occupancy') }}"
-                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-bottom">
-                    <div class="d-flex align-items-center">
-                        <span class="fs-4 fw-bold text-primary opacity-50 me-4">1</span>
-                        <div>
-                            <h5 class="fw-bold mb-0 text-dark">Average Flight Occupancy</h5>
+        <!-- Revenue Card -->
+        <div class="col-md-5">
+            <a href="{{ url_for('admin.report_revenue') }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm hover-lift bg-white overflow-hidden">
+                    <div class="card-body p-4 position-relative">
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div class="icon-box bg-success bg-opacity-10 text-success rounded-3 p-3">
+                                <i class="bi bi-currency-dollar fs-3"></i>
+                            </div>
+                            <span class="badge bg-light text-muted border">Financial</span>
+                        </div>
+                        <h4 class="card-title fw-bold text-dark mb-2">Total Revenue Analysis</h4>
+                        <p class="card-text text-muted">Detailed breakdown of earnings across all aircraft and classes.
+                        </p>
+                        <div class="mt-4 text-success fw-bold small">
+                            VIEW REPORT <i class="bi bi-arrow-right ms-1"></i>
                         </div>
                     </div>
-                    <i class="bi bi-chevron-right text-muted"></i>
-                </a>
-
-                <!-- Report 2 -->
-                <a href="{{ url_for('admin.report_revenue') }}"
-                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-bottom">
-                    <div class="d-flex align-items-center">
-                        <span class="fs-4 fw-bold text-info opacity-50 me-4">2</span>
-                        <div>
-                            <h5 class="fw-bold mb-0 text-dark">Total Revenue Analysis</h5>
-                        </div>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted"></i>
-                </a>
-
-                <!-- Report 3 -->
-                <a href="{{ url_for('admin.report_hours') }}"
-                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-bottom">
-                    <div class="d-flex align-items-center">
-                        <span class="fs-4 fw-bold text-success opacity-50 me-4">3</span>
-                        <div>
-                            <h5 class="fw-bold mb-0 text-dark">Employee Flight Hours</h5>
-                        </div>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted"></i>
-                </a>
-
-                <!-- Report 4 -->
-                <a href="{{ url_for('admin.report_cancellations') }}"
-                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-bottom">
-                    <div class="d-flex align-items-center">
-                        <span class="fs-4 fw-bold text-danger opacity-50 me-4">4</span>
-                        <div>
-                            <h5 class="fw-bold mb-0 text-dark">Cancellation Rate by Month</h5>
-                        </div>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted"></i>
-                </a>
-
-                <!-- Report 5 -->
-                <a href="{{ url_for('admin.report_activity') }}"
-                    class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between border-0">
-                    <div class="d-flex align-items-center">
-                        <span class="fs-4 fw-bold text-warning opacity-50 me-4">5</span>
-                        <div>
-                            <h5 class="fw-bold mb-0 text-dark">Aircraft Activity Summary</h5>
-                        </div>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted"></i>
-                </a>
-
-            </div>
-
-            <div class="text-center mt-4 text-muted small">
-                <i class="bi bi-lock-fill me-1"></i> CONFIDENTIAL INTERNAL DATA
-            </div>
+                    <div class="card-footer bg-success h-1 p-0"></div>
+                </div>
+            </a>
         </div>
+
+        <!-- Employee Hours Card -->
+        <div class="col-md-5">
+            <a href="{{ url_for('admin.report_hours') }}" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm hover-lift bg-white overflow-hidden">
+                    <div class="card-body p-4 position-relative">
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div class="icon-box bg-warning bg-opacity-10 text-warning rounded-3 p-3">
+                                <i class="bi bi-clock-history fs-3"></i>
+                            </div>
+                            <span class="badge bg-light text-muted border">HR & Staffing</span>
+                        </div>
+                        <h4 class="card-title fw-bold text-dark mb-2">Employee Flight Hours</h4>
+                        <p class="card-text text-muted">Track work hours, short vs. long haul shifts for all crew
+                            members.</p>
+                        <div class="mt-4 text-warning fw-bold small">
+                            VIEW REPORT <i class="bi bi-arrow-right ms-1"></i>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-warning h-1 p-0"></div>
+                </div>
+            </a>
+        </div>
+
     </div>
+
+    <div class="text-center mt-5 text-muted small">
+        <i class="bi bi-lock-fill me-1"></i> CONFIDENTIAL INTERNAL DATA
+    </div>
+
+    <style>
+        .hover-lift {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .hover-lift:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 1rem 3rem rgba(0, 0, 0, .1) !important;
+        }
+    </style>
 </div>
 {% endblock %}
