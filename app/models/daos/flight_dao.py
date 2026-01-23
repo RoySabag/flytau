@@ -170,15 +170,15 @@ class FlightDAO:
 
     def _is_flight_full(self, flight_id):
         """Internal Helper: Returns True if occupied seats >= total capacity."""
-        # 1. Get Total Capacity
+        # 1. Get Total Capacity (Dynamic Calculation)
         query_capacity = """
-            SELECT COUNT(*) as total 
-            FROM seats s
-            JOIN flights f ON s.aircraft_id = f.aircraft_id
+            SELECT SUM((row_end - row_start + 1) * CHAR_LENGTH(columns)) as total
+            FROM aircraft_classes ac
+            JOIN flights f ON ac.aircraft_id = f.aircraft_id
             WHERE f.flight_id = %s
         """
         res_cap = self.db.fetch_one(query_capacity, (flight_id,))
-        total = res_cap['total'] if res_cap else 0
+        total = res_cap['total'] if res_cap and res_cap['total'] else 0
         
         if total == 0: return False 
 
