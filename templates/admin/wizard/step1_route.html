@@ -69,4 +69,11 @@
 
     </div>
 </div>
+
+<script>
+    // Set minimum date to current time
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.querySelector('input[name="departure_time"]').min = now.toISOString().slice(0, 16);
+</script>
 {% endblock %}

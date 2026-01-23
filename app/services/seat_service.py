@@ -1,5 +1,8 @@
+"""
+File: seat_service.py
+Purpose: Service Layer for Seat Configuration.
+"""
 import math
-from database.db_manager import DBManager
 
 class SeatService:
     def __init__(self, db_manager):
@@ -7,7 +10,7 @@ class SeatService:
 
     def generate_seats(self, aircraft_id, business_seats, economy_seats):
         """
-        Generates configuration records for `aircraft_classes`.
+        Generates aircraft configuration records (Rows/Cols) based on seat counts.
         """
         # Configuration Assumptions
         # Business: 4 seats per row (AC DF) -> 'ACDF'
@@ -56,6 +59,18 @@ class SeatService:
             print(f"Error configuring aircraft: {e}")
             if conn: conn.rollback()
             return False
-        finally:
-            if cursor: cursor.close()
             if conn: conn.close() 
+
+    def define_aircraft_class(self, aircraft_id, class_name, row_start, row_end, columns):
+        """
+        Manually defines a seating class configuration.
+        """
+        sql = """
+            INSERT INTO aircraft_classes (aircraft_id, class_name, row_start, row_end, columns)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        return self.db.execute_query(sql, (aircraft_id, class_name, row_start, row_end, columns))
+        
+    def clear_configurations(self):
+        """Truncates the aircraft_classes table."""
+        return self.db.execute_query("TRUNCATE TABLE aircraft_classes") 

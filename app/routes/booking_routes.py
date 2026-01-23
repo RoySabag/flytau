@@ -1,3 +1,7 @@
+"""
+File: booking_routes.py
+Purpose: Routes for Booking Wizard & Management (4 Steps + Guest Dashboard).
+"""
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from database.db_manager import DBManager
 from app.services.booking_service import BookingService
@@ -197,4 +201,24 @@ def manage_cancel():
         flash(result['message'], "danger")
         
     return redirect(url_for('booking.manage_dashboard'))
+
+@booking_bp.route('/order/cancel/<int:order_id>', methods=['POST'])
+def cancel_order(order_id):
+    """
+    Cancel action for registered customers (from Profile).
+    """
+    if 'user_email' not in session:
+        return redirect(url_for('routes.login'))
+        
+    result = booking_service.cancel_booking(order_id)
+    
+    if result['status'] == 'success':
+        msg = f"Order Cancelled. Refund: ${result['refund_amount']}"
+        if result['fine'] > 0:
+            msg += f" (Fine: ${result['fine']} applied due to <36h notice)"
+        flash(msg, "info")
+    else:
+        flash(result['message'], "danger")
+        
+    return redirect(url_for('routes.profile'))
 

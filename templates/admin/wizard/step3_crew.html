@@ -49,7 +49,7 @@
                         <label class="form-label fw-bold">Economy Class Price</label>
                         <div class="input-group">
                             <span class="input-group-text bg-dark border-secondary text-muted">$</span>
-                            <input type="number" class="form-control" name="economy_price" required
+                            <input type="number" class="form-control" name="economy_price" required min="0"
                                 placeholder="Example: 150">
                         </div>
                     </div>
@@ -59,7 +59,7 @@
                         <label class="form-label fw-bold text-warning">Business Class Price</label>
                         <div class="input-group">
                             <span class="input-group-text bg-dark border-secondary text-muted">$</span>
-                            <input type="number" class="form-control" name="business_price" required
+                            <input type="number" class="form-control" name="business_price" required min="0"
                                 placeholder="Example: 450">
                         </div>
                     </div>
@@ -182,6 +182,27 @@
     {% endif %}
 </div>
 </form>
+
+<script>
+    document.querySelector('form').addEventListener('submit', function (e) {
+        const eco = document.querySelector('input[name="economy_price"]');
+        const biz = document.querySelector('input[name="business_price"]');
+
+        const ecoVal = parseFloat(eco.value);
+        // Business price might be disabled (not present in formData if disabled, but element exists)
+        // If disabled, value might be "Not Available..." string or existing number.
+        // We only check if it is enabled and required.
+        let bizVal = 0;
+        if (biz && !biz.disabled) {
+            bizVal = parseFloat(biz.value);
+        }
+
+        if (ecoVal < 0 || (biz && !biz.disabled && bizVal < 0)) {
+            e.preventDefault();
+            alert("you can not create a flight with negative price");
+        }
+    });
+</script>
 </div>
 </div>
 {% endblock %}

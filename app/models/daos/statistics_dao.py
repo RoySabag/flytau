@@ -1,23 +1,18 @@
+"""
+File: statistics_dao.py
+Purpose: Data Access Object for Admin Dashboard Analytics (Occupancy, Revenue, Staff Hours).
+"""
+
 class StatisticsDAO:
     """
-    Data Access Object for Analytics & Reporting.
-
-    Aggregates data to power the Admin Dashboard Charts:
-    1.  **Fleet Occupancy**: Efficiency metric (Seats sold vs. Capacity).
-    2.  **Revenue Analysis**: Financial performance by aircraft type.
-    3.  **Crew Workload**: Tracking flight hours for Pilots vs. Attendants.
-    4.  **Operational Reliability**: Cancellation rates and aircraft utilization.
+    Aggregates database metrics to power charts and KPIs for the admin dashboard.
     """
 
     def __init__(self, db_manager):
         self.db = db_manager
 
     def get_avg_fleet_occupancy(self):
-        """
-        KPI: Average Fleet Occupancy.
-        Calculates the percentage of occupied seats for all 'Landed' flights.
-        Used to assess route popularity and fleet efficiency.
-        """
+        """Calculates the average seat occupancy percentage for all landed flights."""
         query = """
             SELECT AVG(occupancy_rate) as avg_occupancy FROM (
                 SELECT 
@@ -29,7 +24,6 @@ class StatisticsDAO:
                     )) as occupancy_rate
                 FROM flights f 
                 LEFT JOIN order_lines ol ON f.flight_id = ol.flight_id
-                -- Join with orders to ensure we count only confirmed/paid orders
                 LEFT JOIN orders o ON ol.unique_order_code = o.unique_order_code
                 WHERE f.flight_status = 'Landed' 
                 AND (o.order_status != 'Cancelled' OR o.order_status IS NULL)
@@ -37,14 +31,11 @@ class StatisticsDAO:
             ) subquery
         """
         result = self.db.fetch_one(query)
-        # Handle case where result is None or no flights
         val = result['avg_occupancy'] if result else 0
         return round(float(val), 1) if val else 0
 
     def get_recent_flights_occupancy(self, limit=5):
-        """
-        Chart Data: Occupancy per individual flight (Last N landed flights).
-        """
+        """Retrieves occupancy rates for the last N landed flights."""
         query = """
             SELECT 
                 f.flight_id,
@@ -72,16 +63,7 @@ class StatisticsDAO:
         return self.db.fetch_all(query, (limit,))
 
     def get_revenue_by_manufacturer(self):
-        """
-        Chart: Revenue by Aircraft Manufacturer & Class.
-        
-        Returns data for a Stacked Bar Chart:
-        - X-Axis: Aircraft Manufacturer (Boeing, Airbus)
-        - Y-Axis: Total Revenue
-        - Stack: Cabin Class (Economy vs Business)
-        """
-        # Note: Revenue is calculated by summing the price of individual tickets sold.
-        # Logic: Join OrderLines -> Flights -> Aircraft -> Seats (for Class info)
+        """Calculates total revenue grouped by Aircraft Manufacturer and Cabin Class."""
         query = """
             SELECT 
                 CONCAT(a.size, ' / ', a.manufacturer, ' / ', ol.class) as label,
@@ -104,11 +86,7 @@ class StatisticsDAO:
         return self.db.fetch_all(query)
 
     def get_employee_flight_hours(self):
-        """
-        Chart: Employee Flight Hours Distribution.
-        Compares 'Short Haul' vs 'Long Haul' work hours for Pilots and Attendants.
-        """
-        # Updated to join 'staff' table because 'crew_members' does not contain names.
+        """Aggregates flight hours for crew members, split by Short/Long haul."""
         query = """
             SELECT 
                 CONCAT(s.first_name, ' ', s.last_name, ' (', cm.role_type, ')') as label,
@@ -128,10 +106,7 @@ class StatisticsDAO:
         return self.db.fetch_all(query)
 
     def get_monthly_cancellation_rate(self):
-        """
-        Chart: Monthly Cancellation Rate Trend.
-        Shows the percentage of total orders that were cancelled (Customer + System) per month.
-        """
+        """Calculates the percentage of cancelled orders per month."""
         query = """
             SELECT 
                 DATE_FORMAT(order_date, '%Y-%m') AS month,
@@ -142,19 +117,13 @@ class StatisticsDAO:
             ORDER BY month DESC
 
         """
-        # Return reversed list to show chronological order in chart
         results = self.db.fetch_all(query)
         return results[::-1] if results else []
 
     def get_aircraft_activity_30_days(self):
         """
-        Chart: Aircraft Activity (Last 30 Days).
-        Combo Chart Data:
-        - Bars: Number of Flights (Landed)
-        - Line: Utilization %
+        Retrieves utilization stats and dominant routes for aircraft over the last 30 days.
         """
-        # Note: Restored 30-day filter as per strict user requirement.
-        # Added COALESCE for NULL handling and moved status/date check to JOIN for correctness.
         query = """
             SELECT 
                 CONCAT('Plane ', a.aircraft_id, ' (', COALESCE(a.manufacturer, 'Unknown'), ')') as label,

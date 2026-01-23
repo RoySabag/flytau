@@ -1,36 +1,28 @@
+"""
+File: employee_dao.py
+Purpose: Data Access Object for Employee Management (Admins, Pilots, Flight Attendants).
+"""
+
 class EmployeeDAO:
     """
-    Data Access Object for Employee Management.
-
-    Handles the hierarchical data structure of staff members:
-    - **Base Table (staff)**: Personal info for everyone (Name, ID, Address).
-    - **Sub Tables**:
-        - **admins**: Authentication details for managerial access.
-        - **crew_members**: Operational details for Pilots/Attendants (Location, Capabilities).
+    Handles access to staff data, joining hierarchical tables (admins, crew_members) as needed.
     """
 
     def __init__(self, db_manager):
         self.db = db_manager
 
     def get_employee_by_id(self, employee_id):
-        """
-        Retrieves a composite employee record.
-        Joins the base 'staff' data with either 'admins' or 'crew_members' details.
-        
-        Returns:
-            dict: The merged employee object, including a synthetic 'role_type' field.
-        """
+        """Retrieves a composite employee record merged with their specific role details."""
         # 1. Check Admin Table first
         query_admin = "SELECT * FROM admins WHERE employee_id = %s"
         admin = self.db.fetch_one(query_admin, (employee_id,))
         if admin:
-             # Fetch basic staff info and merge
              staff = self.db.fetch_one("SELECT * FROM staff WHERE employee_id = %s", (employee_id,))
              if staff:
                 staff['role_type'] = 'Admin'
                 staff.update(admin)
                 return staff
-             return None # Should not happen unless DB integrity is broken
+             return None
 
         # 2. Check Crew Table
         query_crew = "SELECT * FROM crew_members WHERE employee_id = %s"
@@ -38,8 +30,6 @@ class EmployeeDAO:
         if crew:
              staff = self.db.fetch_one("SELECT * FROM staff WHERE employee_id = %s", (employee_id,))
              if staff:
-                # Role is now in staff table ('role' column), but we might map it to 'role_type' for internal consistency if needed.
-                # The staff dict will contain 'role'.
                 staff['role_type'] = staff.get('role') 
                 staff.update(crew) 
                 return staff
@@ -48,7 +38,7 @@ class EmployeeDAO:
         return None
 
     def is_admin(self, employee_id):
-        """Checks role in the staff table."""
+        """Boolean check for admin privileges."""
         query = "SELECT role FROM staff WHERE employee_id = %s"
         result = self.db.fetch_one(query, (employee_id,))
         if result and result['role'] == 'Admin':
@@ -56,23 +46,14 @@ class EmployeeDAO:
         return False
 
     def verify_admin_access(self, employee_id):
-        """
-        Verification helper for restricted routes.
-        Prints a console warning if access is denied.
-        """
+        """Logs a warning and returns False if the employee is not an Admin."""
         if not self.is_admin(employee_id):
             print(f"Access Denied: Employee {employee_id} does not have Admin privileges.")
             return False
         return True
 
     def add_employee(self, id_number, first_name, last_name, phone_number, city, street, house_no, start_date, role_type, password=None, long_haul=0):
-        """
-        Transactional Insert: Adds a new employee to the system.
-        
-        Steps:
-        1. Insert into base `staff` table.
-        2. Insert into appropriate role-specific table (`admins` or `crew_members`).
-        """
+        """Transactionality adds a new employee and their role-specific data."""
         try:
             # 1. Insert into Staff
             query_staff = """
@@ -92,7 +73,6 @@ class EmployeeDAO:
                  self.db.execute_query(query_admin, (id_number, password))
             
             elif role_type in ['Pilot', 'Flight Attendant']:
-                 # role_type is now in staff table. crew_members may track extra data but not role.
                  query_crew = "INSERT INTO crew_members (employee_id, long_haul_certified) VALUES (%s, %s)"
                  self.db.execute_query(query_crew, (id_number, long_haul))
             

@@ -1,14 +1,18 @@
+"""
+File: user_dao.py
+Purpose: Data Access Object for User Management (Customers and Guests).
+"""
 from app.models.entities.user import Customer, Guest
 
 class UserDAO:
     """
-    Data Access Object for User Management (Customers and Guests).
+    Handles retrieval and registration of Customer and Guest users.
     """
     def __init__(self, db_manager):
         self.db = db_manager
 
     def get_customer_by_email(self, email):
-        """Checks if a registered customer exists."""
+        """Checks if a registered customer exists and returns a Customer object."""
         query = "SELECT * FROM customers WHERE customer_email = %s"
         try:
             result = self.db.fetch_all(query, (email,))
@@ -35,7 +39,7 @@ class UserDAO:
             return None
 
     def insert_customer(self, email, password, first_name, last_name, passport, dob, phone_number, additional_phone_number=None):
-        """Registers a new customer."""
+        """Registers a new customer and their contact details."""
         if self.get_customer_by_email(email):
             print(f"Registration failed: Email {email} already exists.")
             return False
@@ -65,7 +69,7 @@ class UserDAO:
             return False
 
     def get_guest(self, email):
-        """Checks if guest exists."""
+        """Retrieves a guest record by email."""
         query = "SELECT * FROM guests WHERE guest_email = %s"
         result = self.db.fetch_all(query, (email,))
         
@@ -74,9 +78,7 @@ class UserDAO:
         return None
 
     def ensure_guest_exists(self, email):
-        """
-        Ensures a guest record exists to satisfy foreign keys.
-        """
+        """Ensures a guest record exists (for foreign key constraints) explicitly."""
         if self.get_guest(email):
             return True 
 

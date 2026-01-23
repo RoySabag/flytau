@@ -1,29 +1,19 @@
+"""
+File: flight_dao.py
+Purpose: Data Access Object for Flight Operations (Creation, Retrieval, Status Updates).
+"""
 from datetime import datetime, timedelta
 
 class FlightDAO:
     """
-    Data Access Object for Flight Operations.
-
-    This class serves as the central hub for managing flight data, including:
-    1.  **Flight Creation**: Assigning routes, times, and initial pricing.
-    2.  **Status Management**: Automatically updating statuses based on real-time checks (Scheduled -> On Air -> Landed).
-    3.  **Booking Logic**: Handling seat availability and "Fully Booked" states.
-    4.  **Admin Operations**: Initializing cancellations and refunds.
-    5.  **Search**: Complex filtering for user flight discovery.
+    Central hub for managing flight data, status updates, and capacity checks.
     """
 
     def __init__(self, db_manager):
         self.db = db_manager
 
-    # =================================================================
-    # Part A: Flight Creation & Initialization
-    # =================================================================
-
     def get_all_locations(self):
-        """
-        Retrieves a list of all unique cities/airports available in the system.
-        Used to populate dropdown menus in the Search and Create Flight forms.
-        """
+        """Retrieves a list of all unique cities/airports available in the system."""
         query = """
             SELECT DISTINCT origin_airport as location FROM routes
             UNION
@@ -33,10 +23,7 @@ class FlightDAO:
         return [row['location'] for row in results]
 
     def get_route_details_by_airports(self, origin, destination):
-        """
-        Fetches route specifications (ID, Duration) for a given origin-destination pair.
-        Used for calculating arrival times and validating flight creation.
-        """
+        """Fetches route ID and duration for a given origin-destination pair."""
         query = """
             SELECT route_id, flight_duration, route_type 
             FROM routes 
@@ -45,7 +32,6 @@ class FlightDAO:
         result = self.db.fetch_one(query, (origin, destination))
         
         if result:
-            # Convert string duration to timedelta object for calculations
             duration = result['flight_duration']
             if isinstance(duration, str):
                 t = datetime.strptime(duration, "%H:%M:%S")
@@ -54,22 +40,13 @@ class FlightDAO:
         return result
 
     def create_flight(self, origin, destination, departure_time, economy_price, business_price):
-        """
-        Creates a new flight record in the database.
-        
-        Logic:
-        1.  Resolves the `route_id` automatically based on origin/destination.
-        2.  Sets the initial status to 'Scheduled'.
-        3.  Note: Aircraft assignment happens in a separate step by the admin.
-        """
-        # 1. Resolve Route ID
+        """Creates a new flight record in the database with status 'Scheduled'."""
         route_info = self.get_route_details_by_airports(origin, destination)
         if not route_info:
             return {"status": "error", "message": f"No route found from {origin} to {destination}"}
         
         route_id = route_info['route_id']
 
-        # 2. Insert into DB
         try:
             if isinstance(departure_time, str):
                 departure_time = datetime.strptime(departure_time, '%Y-%m-%dT%H:%M') 
@@ -91,21 +68,8 @@ class FlightDAO:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    # =================================================================
-    # Part B: Flight Retrieval & Status Updates
-    # =================================================================
-
     def get_all_active_flights(self, flight_id=None, status_filter=None):
-        """
-        Retrieves flights, typically for the Admin Dashboard or Main Schedule.
-        
-        **Dynamic Status Logic**:
-        This method automatically updates flight statuses based on the current time:
-        - Now < Departure: 'Scheduled'
-        - Departure <= Now <= Arrival: 'On Air'
-        - Now > Arrival: 'Landed'
-        - Checks for 'Fully Booked' capacity only for Scheduled flights.
-        """
+        """Retrieves flights and dynamically updates their status based on current time."""
         # 1. Fetch Flights with Joins for Readability
         query = """
             SELECT 
@@ -114,18 +78,12 @@ class FlightDAO:
                 f.flight_status,
                 f.economy_price,
                 f.business_price,
-                
-                -- Route Details
                 r.origin_airport,
                 r.destination_airport,
                 r.flight_duration,
-                
-                -- Aircraft Details
                 f.aircraft_id,
                 a.manufacturer AS aircraft_model,
                 a.size AS aircraft_size,
-                
-                -- Calculated Arrival (SQL side baseline)
                 ADDTIME(f.departure_time, r.flight_duration) as arrival_time
 
             FROM flights f
@@ -150,51 +108,56 @@ class FlightDAO:
         for flight in flights:
             current_status = flight['flight_status']
             
-            # Skip logic for Cancelled flights - they are finalized.
+            # Skip logic for Cancelled flights
             if current_status not in ['Cancelled', 'System Cancelled']:
-                
-                # --- Time-Based Status Update ---
-                dep = flight['departure_time']
-                if isinstance(dep, str):
-                     dep = datetime.strptime(dep, '%Y-%m-%d %H:%M:%S')
-    
-                duration = flight['flight_duration']
-                if isinstance(duration, str):
-                     t = datetime.strptime(duration, "%H:%M:%S")
-                     duration = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
-    
-                arrival = dep + duration
-                
-                new_status = 'Scheduled'
-                if now > arrival:
-                    new_status = 'Landed'
-                elif now >= dep:
-                    new_status = 'On air'
-                
-                if new_status != current_status and current_status != 'Fully Booked': 
-                    # Note: We let the Fully Booked check below handle overrides if needed, 
-                    # but generally time status takes precedence over capacity if flight has started.
-                    if current_status == 'Fully Booked' and new_status == 'Scheduled':
-                         pass # Keep Fully Booked if it hasn't taken off yet
-                    else:
+                try:
+                    # --- Time-Based Status Update ---
+                    dep = flight['departure_time']
+                    if isinstance(dep, str):
                         try:
+                            dep = datetime.strptime(dep, '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                             print(f"Warning: Invalid date format for flight {flight['flight_id']}")
+                             filtered_flights.append(flight)
+                             continue
+    
+                    duration = flight['flight_duration']
+                    if isinstance(duration, str):
+                         try:
+                             t = datetime.strptime(duration, "%H:%M:%S")
+                             duration = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+                         except ValueError:
+                             duration = timedelta(hours=0)
+    
+                    arrival = dep + duration
+                    
+                    new_status = 'Scheduled'
+                    if now > arrival:
+                        new_status = 'Landed'
+                    elif now >= dep:
+                        new_status = 'On air'
+                    
+                    if new_status != current_status and current_status != 'Fully Booked': 
+                        if current_status == 'Fully Booked' and new_status == 'Scheduled':
+                             pass 
+                        else:
                             self.update_flight_status(flight['flight_id'], new_status)
                             flight['flight_status'] = new_status
-                        except Exception as e:
-                            print(f"Error updating status: {e}")
-                
-                # --- Capacity Check (Fully Booked) ---
-                # Only runs if flight is pre-departure.
-                if flight['flight_status'] in ['Scheduled', 'Fully Booked']:
-                    is_full = self._is_flight_full(flight['flight_id'])
                     
-                    final_status = 'Fully Booked' if is_full else 'Scheduled'
-                    
-                    if final_status != flight['flight_status']:
-                        self.update_flight_status(flight['flight_id'], final_status)
-                        flight['flight_status'] = final_status
+                    # --- Capacity Check ---
+                    if flight['flight_status'] in ['Scheduled', 'Fully Booked']:
+                        is_full = self._is_flight_full(flight['flight_id'])
+                        
+                        final_status = 'Fully Booked' if is_full else 'Scheduled'
+                        
+                        if final_status != flight['flight_status']:
+                            self.update_flight_status(flight['flight_id'], final_status)
+                            flight['flight_status'] = final_status
 
-                flight['arrival_time'] = arrival
+                    flight['arrival_time'] = arrival
+                    
+                except Exception as e:
+                    print(f"Error processing status for flight {flight.get('flight_id')}: {e}")
 
             # --- Apply Filter ---
             if status_filter and status_filter != 'All':
@@ -206,10 +169,7 @@ class FlightDAO:
         return filtered_flights
 
     def _is_flight_full(self, flight_id):
-        """
-        Internal Helper: Checks if specific flight is at 100% capacity.
-        Compares Total Seats (from Aircraft) vs. Sold Tickets (from Active Orders).
-        """
+        """Internal Helper: Returns True if occupied seats >= total capacity."""
         # 1. Get Total Capacity
         query_capacity = """
             SELECT COUNT(*) as total 
@@ -235,9 +195,7 @@ class FlightDAO:
         return occupied >= total
 
     def get_flight_by_id(self, flight_id):
-        """
-        Retrieves a single flight's comprehensive details.
-        """
+        """Retrieves a single flight's comprehensive details."""
         query = """
             SELECT f.*, 
                    r.origin_airport, r.destination_airport, r.flight_duration, r.route_type,
@@ -249,10 +207,6 @@ class FlightDAO:
         """
         return self.db.fetch_one(query, (flight_id,))
 
-    # =================================================================
-    # Part C: Admin Actions (Updates & Cancellations)
-    # =================================================================
-
     def update_flight_status(self, flight_id, new_status):
         """Directly updates the status column in the database."""
         try:
@@ -263,17 +217,7 @@ class FlightDAO:
             return {"status": "error", "message": str(e)}
 
     def cancel_flight_transaction(self, flight_id):
-        """
-        Executes a Company Cancellation logic (Admin cancels flight).
-        
-        **Rules:**
-        1.  Must be > 72 hours before departure.
-        2.  Updates flight status to 'Cancelled'.
-        3.  Refunding:
-            - Finds all active orders.
-            - Updates them to 'system_cancelled'.
-            - Sets their price to 0 (Full Refund).
-        """
+        """Cancels a flight, refunds all active orders, and updates statuses (Transactional)."""
         conn = self.db.get_connection()
         if not conn:
             return {"status": "error", "message": "DB connection failed"}
@@ -292,7 +236,7 @@ class FlightDAO:
                 conn.rollback()
                 return {"status": "error", "message": "Flight is already cancelled"}
 
-            # 2. Validate Time Window (72 Hours)
+            # 2. Validate Time Window
             dep_time = flight['departure_time']
             if isinstance(dep_time, str):
                 dep_time = datetime.strptime(dep_time, '%Y-%m-%d %H:%M:%S')
@@ -312,7 +256,6 @@ class FlightDAO:
             active_orders = cursor.fetchall()
             
             if active_orders:
-                # Update status to system_cancelled and Price to 0 to indicate full refund
                 cursor.execute("""
                     UPDATE orders 
                     SET order_status = 'system_cancelled', total_price = 0 
@@ -338,14 +281,8 @@ class FlightDAO:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    # =================================================================
-    # Part D: Seat Management & Booking
-    # =================================================================
-
     def get_flight_seats(self, flight_id):
-        """
-        Generates a "Seat Map" for the UI dynamically from Aircraft Configuration.
-        """
+        """Generates a dynamic 'Seat Map' from Aircraft Configuration."""
         # 1. Fetch Flight Context
         flight = self.get_flight_by_id(flight_id)
         if not flight: return None
@@ -363,7 +300,7 @@ class FlightDAO:
         if not configs:
             return []
 
-        # 3. Fetch Occupied Seats (Row/Col)
+        # 3. Fetch Occupied Seats
         query_occupied = """
             SELECT ol.row_number, ol.column_number
             FROM order_lines ol
@@ -371,19 +308,10 @@ class FlightDAO:
             WHERE ol.flight_id = %s AND o.order_status != 'Cancelled'
         """
         occupied_results = self.db.fetch_all(query_occupied, (flight_id,))
-        # Create a set of "Row-Col" strings for fast lookup
         occupied_set = {f"{row['row_number']}-{row['column_number']}" for row in occupied_results}
 
         # 4. Generate Seat Map
         final_seats = []
-        
-        # We need to assign a fake 'seat_id' for the frontend to work if it relies on it, 
-        # OR update frontend. For now, we'll generate a composite ID like "ROW-COL" 
-        # but if the frontend expects INT, we might need to hash or just change frontend.
-        # Looking at previous code, seat_id was INT.
-        # Let's check if we can assume frontend handles string IDs? 
-        # The frontend likely uses it values in checkboxes.
-        # We will use "row_col" string as seat_id.
         
         for cfg in configs:
             cls_name = cfg['class_name']
@@ -396,7 +324,7 @@ class FlightDAO:
                     is_occupied = unique_id in occupied_set
                     
                     seat_obj = {
-                        'seat_id': unique_id, # Virtual ID
+                        'seat_id': unique_id, 
                         'row_number': r,
                         'column_number': c,
                         'class': cls_name,
@@ -407,15 +335,8 @@ class FlightDAO:
 
         return final_seats
 
-    # =================================================================
-    # Part E: User Search
-    # =================================================================
-
     def search_flights(self, origin, destination, date):
-        """
-        Executes a flight search based on user criteria.
-        Returns detailed flight info including aircraft and pricing.
-        """
+        """Executes a flight search based on origin, destination, and date."""
         try:
             query = """
                 SELECT 

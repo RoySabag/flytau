@@ -1,3 +1,7 @@
+"""
+File: admin_routes.py
+Purpose: Routes for Admin Panel (Wizard, Dashboard, Reports).
+"""
 from flask import Blueprint, render_template, request, session, redirect, url_for, current_app, flash
 from database.db_manager import DBManager
 from app.services.flight_service import FlightService
@@ -13,6 +17,7 @@ auth_service = AuthService(db)
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    """Admin Login Page."""
     if request.method == 'POST':
         emp_id = request.form.get('employee_id')
         password = request.form.get('password')
@@ -29,17 +34,30 @@ def login():
 
 @admin_bp.route('/dashboard')
 def dashboard():
+    """Main Admin Dashboard."""
     return render_template('admin/dashboard.html')
 
 # --- Wizard Step 1: Route & Time ---
 @admin_bp.route('/create_flight/step1', methods=['GET', 'POST'])
 def create_flight_step1():
+    """Step 1: Select Route and Departure Time."""
     if request.method == 'POST':
         session['wizard_data'] = {
             'origin': request.form.get('origin'),
             'destination': request.form.get('destination'),
             'departure_time': request.form.get('departure_time')
         }
+        
+        # Validation: Date must be in future
+        try:
+            dep_time = datetime.strptime(session['wizard_data']['departure_time'], '%Y-%m-%dT%H:%M')
+            if dep_time < datetime.now():
+                flash("Error: Departure time cannot be in the past.", "danger")
+                return redirect(url_for('admin.create_flight_step1'))
+        except ValueError:
+             flash("Error: Invalid date format.", "danger")
+             return redirect(url_for('admin.create_flight_step1'))
+             
         return redirect(url_for('admin.create_flight_step2'))
 
     locations = flight_service.get_all_locations()
@@ -48,6 +66,7 @@ def create_flight_step1():
 # --- Wizard Step 2: Aircraft Selection ---
 @admin_bp.route('/create_flight/step2', methods=['GET', 'POST'])
 def create_flight_step2():
+    """Step 2: Assign Aircraft."""
     wizard_data = session.get('wizard_data', {})
     if not wizard_data: return redirect(url_for('admin.create_flight_step1'))
 
@@ -78,6 +97,7 @@ def create_flight_step2():
 # --- Wizard Step 3: Crew Selection ---
 @admin_bp.route('/create_flight/step3', methods=['GET', 'POST'])
 def create_flight_step3():
+    """Step 3: Assign Crew and Set Prices."""
     wizard_data = session.get('wizard_data', {})
     if not wizard_data: return redirect(url_for('admin.create_flight_step1'))
 
@@ -118,8 +138,16 @@ def create_flight_step3():
         wizard_data['pilot_ids'] = pilot_ids
         wizard_data['attendant_ids'] = attendant_ids
         
-        economy_price = request.form.get('economy_price')
-        business_price = request.form.get('business_price')
+        try:
+            economy_price = float(request.form.get('economy_price'))
+            business_price = float(request.form.get('business_price'))
+            if economy_price < 0 or business_price < 0:
+                flash("you can not create a flight with negative price", "danger")
+                return redirect(url_for('admin.create_flight_step3'))
+        except ValueError:
+             flash("Error: Invalid price format.", "danger")
+             return redirect(url_for('admin.create_flight_step3'))
+
         if aircraft_size != 'Big': business_price = 0
         
         wizard_data['economy_price'] = economy_price
@@ -169,6 +197,7 @@ def create_flight_step3():
 
 @admin_bp.route('/flights')
 def view_flights():
+    """Lists all active flights with update capability."""
     flight_id = request.args.get('flight_id')
     status = request.args.get('status')
     
@@ -181,6 +210,7 @@ def view_flights():
 
 @admin_bp.route('/cancel_flight/<int:flight_id>', methods=['POST'])
 def cancel_flight(flight_id):
+    """Admin flight cancellation action."""
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin.login'))
         
@@ -195,6 +225,7 @@ def cancel_flight(flight_id):
 
 @admin_bp.route('/add_crew', methods=['GET', 'POST'])
 def add_crew():
+    """Form to add new pilots or attendants."""
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin.login'))
         
@@ -244,12 +275,14 @@ def add_crew():
 
 @admin_bp.route('/dashboard/reports')
 def reports_hub():
+    """Analytics Hub Page."""
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin.login'))
     return render_template('admin/reports/hub.html')
 
 @admin_bp.route('/dashboard/reports/occupancy')
 def report_occupancy():
+    """Specific Report: Fleet Occupancy."""
     if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
     
     # Kpi Occupancy
@@ -260,6 +293,7 @@ def report_occupancy():
 
 @admin_bp.route('/dashboard/reports/revenue')
 def report_revenue():
+    """Specific Report: Revenue Analysis."""
     if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
     
     data = flight_service.stats_dao.get_revenue_by_manufacturer()
@@ -267,6 +301,7 @@ def report_revenue():
 
 @admin_bp.route('/dashboard/reports/hours')
 def report_hours():
+    """Specific Report: Employee Flight Hours."""
     if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
     
     data = flight_service.stats_dao.get_employee_flight_hours()
@@ -274,6 +309,7 @@ def report_hours():
 
 @admin_bp.route('/dashboard/reports/cancellations')
 def report_cancellations():
+    """Specific Report: Cancellation Trends."""
     if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
     
     data = flight_service.stats_dao.get_monthly_cancellation_rate()
@@ -281,6 +317,7 @@ def report_cancellations():
 
 @admin_bp.route('/dashboard/reports/activity')
 def report_activity():
+    """Specific Report: Aircraft Activity."""
     if not session.get('admin_logged_in'): return redirect(url_for('admin.login'))
     
     data = flight_service.stats_dao.get_aircraft_activity_30_days()
@@ -288,6 +325,7 @@ def report_activity():
 
 @admin_bp.route('/add_aircraft', methods=['GET', 'POST'])
 def add_aircraft():
+    """Form to register new aircraft to the fleet."""
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin.login'))
 

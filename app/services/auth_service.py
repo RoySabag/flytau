@@ -1,10 +1,13 @@
-from datetime import datetime
+"""
+File: auth_service.py
+Purpose: Service Layer for Authentication (Customer & Employee).
+"""
 from app.models.daos.user_dao import UserDAO
 from app.models.daos.employee_dao import EmployeeDAO
 
 class AuthService:
     """
-    Service Layer for Authentication (Customer & Employee).
+    Handles login and registration logic for all user types.
     """
     def __init__(self, db_manager):
         self.user_dao = UserDAO(db_manager)
@@ -18,10 +21,7 @@ class AuthService:
         return None
 
     def register_customer(self, form_data):
-        """
-        Registers a new customer.
-        Expected keys: email, password, first_name, last_name, passport, dob, phone_number, additional_phone_number
-        """
+        """Registers a new customer with provided form data."""
         return self.user_dao.insert_customer(
             email=form_data['email'],
             password=form_data['password'],
@@ -35,14 +35,8 @@ class AuthService:
 
     def login_admin(self, employee_id, password):
         """Authenticates an admin employee."""
-        # For now, password check might be simple or missing in DAO, 
-        # but the route checked existence + is_admin.
-        # Ideally DAO should verify password too.
-        # Based on route logic:
         employee = self.employee_dao.get_employee_by_id(employee_id)
         if employee and self.employee_dao.is_admin(employee_id):
-            # Verify password against database record
-            # Note: In a production app, verify_hash(password, employee['login_password'])
             if employee.get('login_password') == password:
                 return employee
         return None

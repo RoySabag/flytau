@@ -1,30 +1,33 @@
+"""
+File: booking_service.py
+Purpose: Service Layer for Booking Operations (Selection, Payment, History).
+"""
 from app.models.daos.flight_dao import FlightDAO
 from app.models.daos.order_dao import OrderDAO
 from app.models.daos.user_dao import UserDAO
-from app.models.entities.user import Guest
 
 class BookingService:
     """
-    Service Layer for Booking Operations.
+    Orchestrates the booking flow from seat selection to order finalization.
     """
     def __init__(self, db_manager):
-        # Initialize DAOs
         self.flight_dao = FlightDAO(db_manager)
         self.order_dao = OrderDAO(db_manager)
         self.user_dao = UserDAO(db_manager)
 
     # --- Booking Flow ---
     def get_flight_for_booking(self, flight_id):
+        """Retrieves flight details context for the booking wizard."""
         return self.flight_dao.get_flight_by_id(flight_id)
 
     def init_booking_process(self, flight_id, guest_email):
-        """Ensures guest exists if email provided."""
+        """Ensures transient guest records exist before order creation."""
         if guest_email:
             self.user_dao.ensure_guest_exists(guest_email)
         return True
 
     def get_seat_map(self, flight_id):
-        """Returns structured seat map."""
+        """Returns a structured dictionary of seats grouped by row for UI rendering."""
         seats = self.flight_dao.get_flight_seats(flight_id)
         seats_by_row = {}
         if seats:
@@ -40,7 +43,7 @@ class BookingService:
         return seats_by_row
 
     def process_seat_selection(self, flight_id, selected_seat_ids):
-        """Calculates price and details for selected seats."""
+        """Calculates total price and retrieves text details for selected seat IDs."""
         all_seats = self.flight_dao.get_flight_seats(flight_id)
         seat_map = {str(s['seat_id']): s for s in all_seats}
         
@@ -56,7 +59,7 @@ class BookingService:
         return details, total_price
 
     def finalize_booking(self, flight_id, customer_email, guest_email, total_price, seat_ids):
-        """Creates the order in DB."""
+        """Persists the final order and associated tickets."""
         return self.order_dao.create_order(
             flight_id=flight_id,
             customer_email=customer_email,
@@ -66,18 +69,17 @@ class BookingService:
         )
 
     def get_order_confirmation(self, code):
-        """Fetches order for confirmation page."""
+        """Fetches complete order details for the confirmation page."""
         order = self.order_dao.get_order_details(code)
         return order
 
     # --- Manage Booking ---
     def verify_booking_access(self, order_code, email):
-        """Verifies if email matches the order for management access."""
+        """Verifies if the provided email matches the order (Security Check)."""
         order = self.order_dao.get_order_details(order_code)
         if not order:
             return None
         
-        # Check against guest OR customer email
         if (order.get('guest_email') and order['guest_email'].lower() == email.lower()) or \
            (order.get('customer_email') and order['customer_email'].lower() == email.lower()):
             return order
@@ -85,7 +87,9 @@ class BookingService:
         return None
 
     def cancel_booking(self, order_code):
+        """Cancels an existing order (delegates to OrderDAO)."""
         return self.order_dao.cancel_order(order_code)
 
     def get_customer_history(self, email, status_filter=None):
+        """Retrieves order history for a logged-in customer."""
         return self.order_dao.get_customer_orders(email, status_filter)

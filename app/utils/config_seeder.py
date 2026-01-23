@@ -4,79 +4,63 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from database.db_manager import DB
+from app.services.seat_service import SeatService
 
-# Logic ported from old seats_seeder.py
-AIRCRAFT_CONFIG = {
-    1: {'rows': 30, 'cols': 'ABCDEF', 'business_rows': 0},           
-    2: {'rows': 40, 'cols': 'ABCDEFGH', 'business_rows': 6},         
-    3: {'rows': 25, 'cols': 'ABCDEF', 'business_rows': 0},           
-    4: {'rows': 45, 'cols': 'ABCDEFGHK', 'business_rows': 8},        
-    5: {'rows': 55, 'cols': 'ABCDEFGHK', 'business_rows': 10},       
-    6: {'rows': 20, 'cols': 'ACDF', 'business_rows': 0},             
-}
+def get_config_by_size(size):
+    """
+    Returns the seat configuration based on the aircraft size.
+    """
+    size = str(size).lower()
+    
+    if size == 'big':
+        return {'rows': 45, 'cols': 'ABCDEFGH', 'business_rows': 5}
+    else:
+        return {'rows': 30, 'cols': 'ABCDEF', 'business_rows': 0}
 
 def seed_configs():
-    print("🚀 Seeding Aircraft Configurations...")
+    print("🚀 Seeding Aircraft Configurations (via SeatService)...")
     
-    conn = DB.get_connection()
-    if not conn: return
-    cursor = conn.cursor()
-
+    # Initialize Service
+    seat_service = SeatService(DB)
+    
     try:
-        # Clear existing configs
-        cursor.execute("TRUNCATE TABLE aircraft_classes")
+        # 1. Clear existing
+        seat_service.clear_configurations()
         
+        # 2. Fetch Aircraft
         aircrafts = DB.fetch_all("SELECT * FROM aircraft")
         
         count = 0
-        for a in aircrafts:
-            aid = a['aircraft_id']
-            size_val = str(a.get('size', '')).lower()
-            is_big = size_val == 'big'
+        for aircraft in aircrafts:
+            aircraft_id = aircraft['aircraft_id']
+            size = aircraft.get('size')
             
-            # Determine logic
-            config = None
-            if aid in AIRCRAFT_CONFIG:
-                config = AIRCRAFT_CONFIG[aid]
-            else:
-                if is_big:
-                    config = {'rows': 45, 'cols': 'ABCDEFGH', 'business_rows': 5}
-                else:
-                    config = {'rows': 30, 'cols': 'ABCDEF', 'business_rows': 0}
+            # 3. Determine Config
+            config = get_config_by_size(size)
             
             total_rows = config['rows']
             cols = config['cols']
             biz_rows = config['business_rows']
             
-            # Insert Business Class (if exists)
+            # 4. Define Business Class
             if biz_rows > 0:
-                sql_biz = """
-                    INSERT INTO aircraft_classes (aircraft_id, class_name, row_start, row_end, columns)
-                    VALUES (%s, 'Business', 1, %s, %s)
-                """
-                cursor.execute(sql_biz, (aid, biz_rows, cols))
+                seat_service.define_aircraft_class(
+                    aircraft_id, 'Business', 1, biz_rows, cols
+                )
                 
-            # Insert Economy Class
-            # Starts after business, or at 1
+            # 5. Define Economy Class
             eco_start = biz_rows + 1
             if eco_start <= total_rows:
-                sql_eco = """
-                    INSERT INTO aircraft_classes (aircraft_id, class_name, row_start, row_end, columns)
-                    VALUES (%s, 'Economy', %s, %s, %s)
-                """
-                cursor.execute(sql_eco, (aid, eco_start, total_rows, cols))
+                seat_service.define_aircraft_class(
+                    aircraft_id, 'Economy', eco_start, total_rows, cols
+                )
             
             count += 1
             
-        conn.commit()
-        print(f"✅ Configured {count} aircrafts successfully.")
+        print(f"✅ Successfully configured {count} aircrafts.")
         
     except Exception as e:
         print(f"❌ Error seeding configs: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
-        conn.close()
 
 if __name__ == "__main__":
     seed_configs()

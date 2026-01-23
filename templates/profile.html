@@ -103,7 +103,7 @@
                     <td>
                         {% if order.order_status == 'active' %}
                         <form
-                            action="{{ url_for('routes.cancel_order', order_id=order.unique_order_code or order.order_id) }}"
+                            action="{{ url_for('booking.cancel_order', order_id=order.unique_order_code or order.order_id) }}"
                             method="POST"
                             onsubmit="return confirm('Use 36h cancellation policy? Refund will be 95% of total.');">
                             <button type="submit" class="btn btn-sm btn-outline-danger">
