@@ -89,7 +89,10 @@ def create_flight_step2():
         wizard_data['departure_time'], 
         route_info['flight_duration']
     )
-    
+
+    if not available_aircrafts:
+        flash("Warning: No suitable aircraft found for this route/schedule!", "warning")
+
     return render_template('admin/wizard/step2_aircraft.html', 
                            aircrafts=available_aircrafts,
                            route_info=route_info)
@@ -218,6 +221,8 @@ def cancel_flight(flight_id):
     
     if result['status'] == 'success':
         flash(result['message'], "success")
+    elif result['status'] == 'warning':
+        flash(result['message'], "warning")
     else:
         flash(f"Error: {result['message']}", "danger")
         

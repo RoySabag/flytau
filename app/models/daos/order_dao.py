@@ -196,10 +196,7 @@ class OrderDAO:
         
         # 3. Validate Time Window
         if hours_diff < 36:
-             return {
-                 "status": "error", 
-                 "message": f"Cancellation rejected. Flight departs in {round(hours_diff, 1)} hours (Minimum 36h notice required)."
-             }
+             raise ValueError(f"Cancellation rejected. Flight departs in {round(hours_diff, 1)} hours (Minimum 36h notice required).")
 
         # 4. Calculate Financials (5% Penalty)
         fine = total_price * 0.05

@@ -88,7 +88,10 @@ class BookingService:
 
     def cancel_booking(self, order_code):
         """Cancels an existing order (delegates to OrderDAO)."""
-        return self.order_dao.cancel_order(order_code)
+        try:
+            return self.order_dao.cancel_order(order_code)
+        except ValueError as e:
+            return {"status": "error", "message": str(e)}
 
     def get_customer_history(self, email, status_filter=None):
         """Retrieves order history for a logged-in customer."""

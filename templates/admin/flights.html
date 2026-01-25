@@ -133,11 +133,18 @@
                             {% endif %}
 
                             <div class="mt-1 small" style="line-height:1.1;">
-                                <span class="text-success fw-bold" style="font-size: 0.7rem;">${{ flight.economy_price
-                                    }}</span>
-                                <span class="text-muted mx-1">|</span>
-                                <span class="text-info fw-bold" style="font-size: 0.7rem;">${{ flight.business_price
-                                    }}</span>
+                                <div class="d-flex align-items-center mb-1">
+                                    <span class="badge bg-light text-secondary border me-1"
+                                        style="width: 35px;">Eco</span>
+                                    <span class="text-success fw-bold" style="font-size: 0.75rem;">${{
+                                        flight.economy_price }}</span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-light text-secondary border me-1"
+                                        style="width: 35px;">Bus</span>
+                                    <span class="text-info fw-bold" style="font-size: 0.75rem;">${{
+                                        flight.business_price }}</span>
+                                </div>
                             </div>
                         </td>
                         <td>

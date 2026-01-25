@@ -244,9 +244,12 @@ class FlightDAO:
             time_diff = dep_time - datetime.now()
             hours_diff = time_diff.total_seconds() / 3600
             
-            if hours_diff < 72:
-                conn.rollback()
-                return {"status": "error", "message": "Cannot cancel flight less than 72 hours before departure."}
+            # Warn if cancelling very close to departure
+            status_code = "success"
+            msg_prefix = ""
+            if hours_diff < 24:
+                status_code = "warning"
+                msg_prefix = f"Warning: Flight cancelled less than {round(hours_diff, 1)}h before departure. "
 
             # 3. Cancel Flight
             cursor.execute("UPDATE flights SET flight_status = 'Cancelled' WHERE flight_id = %s", (flight_id,))
@@ -263,7 +266,7 @@ class FlightDAO:
                 """, (flight_id,))
             
             conn.commit()
-            return {"status": "success", "message": f"Flight cancelled. {len(active_orders)} orders refunded."}
+            return {"status": status_code, "message": f"{msg_prefix}Flight cancelled. {len(active_orders)} orders refunded."}
 
         except Exception as e:
             conn.rollback()

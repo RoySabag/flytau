@@ -109,6 +109,14 @@ class FlightService:
     # --- Fleet Management ---
     def register_new_aircraft(self, manufacturer, size, economy_seats, business_seats, purchase_date=None):
         """Creates a new aircraft and seeds its seat configuration configuration."""
+        
+        # Validation: Business Class Rules
+        if size == 'Big' and business_seats == 0:
+            return {"status": "error", "message": "Big aircraft must have Business Class seats."}
+        
+        if size == 'Small' and business_seats > 0:
+            return {"status": "error", "message": "Small aircraft cannot have Business Class seats."}
+
         # 1. Add Aircraft
         aircraft_id = self.aircraft_service.register_new_aircraft(manufacturer, size, purchase_date)
         if not aircraft_id:

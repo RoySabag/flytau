@@ -98,4 +98,32 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sizeSelect = document.querySelector('select[name="size"]');
+        const businessInput = document.querySelector('input[name="business_seats"]');
+        
+        function updateFormState() {
+            const size = sizeSelect.value;
+            
+            if (size === 'Small') {
+                // Small: No business class allowed
+                businessInput.value = 0;
+                businessInput.disabled = true;
+                businessInput.removeAttribute('min');
+            } else if (size === 'Big') {
+                // Big: Must have business class
+                businessInput.disabled = false;
+                businessInput.setAttribute('min', '1');
+            }
+        }
+
+        // Listen for changes
+        sizeSelect.addEventListener('change', updateFormState);
+        
+        // Initialize state
+        updateFormState();
+    });
+</script>
 {% endblock %}
